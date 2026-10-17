@@ -1,0 +1,23 @@
+# HealthInsight Python Dependencies
+# Update version numbers to match your actual installed versions after verification.
+
+# PySpark — must match installed Apache Spark version exactly
+pyspark==3.5.3
+
+# MongoDB Python client
+pymongo==4.8.0
+
+# Trino Python client (for Superset connection and validation scripts)
+trino==0.330.0
+
+# Data processing
+pandas==2.2.2
+pyarrow==16.1.0
+
+# Environment management
+python-dotenv==1.0.1
+
+# Apache Superset (install separately in its own virtual environment)
+# apache-superset==4.0.1
+# flask==2.3.3
+# gunicorn==21.2.0

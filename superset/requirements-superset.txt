@@ -1,0 +1,11 @@
+﻿# Superset dependencies — install in a SEPARATE virtual environment
+# DO NOT mix with the main PySpark environment
+#
+# Setup:
+#   python3 -m venv venv-superset
+#   source venv-superset/bin/activate   (Linux/Mac)
+#   venv-superset\Scripts\activate      (Windows)
+#   pip install -r superset/requirements-superset.txt
+
+apache-superset
+trino

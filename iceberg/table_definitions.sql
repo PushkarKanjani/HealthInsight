@@ -1,0 +1,80 @@
+-- HealthInsight Iceberg Table Definitions
+-- These are REFERENCE DDL statements.
+-- Actual tables are created by spark/02_create_iceberg_tables.py.
+-- UPDATE these definitions after running 01_profile_dataset.py and confirming real columns.
+
+-- IMPORTANT: Use Spark to create Iceberg tables, not raw SQL.
+-- This file is for documentation and reference only.
+
+-- ============================================================
+-- healthcare.patients
+-- ============================================================
+-- CREATE TABLE IF NOT EXISTS healthcare.patients (
+--     patient_id       STRING        NOT NULL,
+--     gender           STRING,
+--     birth_date       DATE,
+--     race             STRING,
+--     ethnicity        STRING,
+--     age              INT,
+--     age_group        STRING
+-- ) USING iceberg;
+
+-- ============================================================
+-- healthcare.encounters
+-- ============================================================
+-- CREATE TABLE IF NOT EXISTS healthcare.encounters (
+--     encounter_id             STRING NOT NULL,
+--     patient_id               STRING NOT NULL,
+--     organization_id          STRING,
+--     encounter_type           STRING,
+--     encounter_start          TIMESTAMP,
+--     encounter_stop           TIMESTAMP,
+--     encounter_duration_days  DOUBLE,
+--     base_cost                DOUBLE,    -- include only if column exists in CSV
+--     total_claim_cost         DOUBLE     -- include only if column exists in CSV
+-- ) USING iceberg;
+
+-- ============================================================
+-- healthcare.conditions
+-- ============================================================
+-- CREATE TABLE IF NOT EXISTS healthcare.conditions (
+--     patient_id             STRING NOT NULL,
+--     encounter_id           STRING,
+--     condition_description  STRING,
+--     condition_code         STRING,
+--     start_date             DATE,
+--     stop_date              DATE
+-- ) USING iceberg;
+
+-- ============================================================
+-- healthcare.organizations
+-- ============================================================
+-- CREATE TABLE IF NOT EXISTS healthcare.organizations (
+--     organization_id    STRING NOT NULL,
+--     organization_name  STRING,
+--     city               STRING,
+--     state              STRING
+-- ) USING iceberg;
+
+-- ============================================================
+-- healthcare.healthcare_analytics (canonical joined table)
+-- ============================================================
+-- CREATE TABLE IF NOT EXISTS healthcare.healthcare_analytics (
+--     patient_id               STRING,
+--     encounter_id             STRING,
+--     gender                   STRING,
+--     birth_date               DATE,
+--     age                      INT,
+--     age_group                STRING,
+--     race                     STRING,
+--     ethnicity                STRING,
+--     encounter_type           STRING,
+--     encounter_start          TIMESTAMP,
+--     encounter_stop           TIMESTAMP,
+--     encounter_duration_days  DOUBLE,
+--     base_cost                DOUBLE,
+--     total_claim_cost         DOUBLE,
+--     condition_description    STRING,
+--     organization_id          STRING,
+--     organization_name        STRING
+-- ) USING iceberg;

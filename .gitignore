@@ -1,0 +1,41 @@
+# Environment and secrets
+.env
+.env.local
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+venv-superset/
+*.egg-info/
+
+# Data files (raw data immutable and too large for git)
+data/raw/*
+!data/raw/.gitkeep
+data/sample/*
+!data/sample/.gitkeep
+
+# Iceberg warehouse (runtime generated)
+iceberg/warehouse/*
+!iceberg/warehouse/.gitkeep
+
+# Superset runtime
+superset_home/
+superset/screenshots/*
+!superset/screenshots/.gitkeep
+
+# Spark / Trino / DB logs and metastore
+*.log
+spark-warehouse/
+derby.log
+metastore_db/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+
