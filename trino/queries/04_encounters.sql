@@ -1,44 +1,51 @@
 -- 04_encounters.sql — Encounter Analytics
 -- Run against: Trino with Iceberg catalog
+-- Table: iceberg.healthcare.encounter_analytics (1 row per encounter)
 
--- Encounter count by type
+-- 1. Encounter count by class / type
 SELECT
-    encounter_type,
-    COUNT(*) AS encounter_count
-FROM iceberg.healthcare.healthcare_analytics
-WHERE encounter_type IS NOT NULL
-GROUP BY encounter_type
+    encounter_class,
+    COUNT(*) AS encounter_count,
+    ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) AS percentage
+FROM iceberg.healthcare.encounter_analytics
+WHERE encounter_class IS NOT NULL
+GROUP BY encounter_class
 ORDER BY encounter_count DESC;
 
--- Average encounter duration by type
+-- 2. Average encounter duration by class (in minutes)
 SELECT
-    encounter_type,
-    ROUND(AVG(encounter_duration_days), 2) AS avg_duration_days,
+    encounter_class,
+    ROUND(AVG(duration_minutes), 2) AS avg_duration_minutes,
     COUNT(*) AS encounter_count
-FROM iceberg.healthcare.healthcare_analytics
-WHERE encounter_type IS NOT NULL
-  AND encounter_duration_days IS NOT NULL
-GROUP BY encounter_type
-ORDER BY avg_duration_days DESC;
+FROM iceberg.healthcare.encounter_analytics
+WHERE encounter_class IS NOT NULL
+  AND duration_minutes IS NOT NULL
+GROUP BY encounter_class
+ORDER BY avg_duration_minutes DESC;
 
--- Average and total cost by encounter type (only if cost columns exist)
+-- 3. Average and total financial cost by encounter class
 SELECT
-    encounter_type,
-    ROUND(AVG(total_claim_cost), 2) AS avg_claim_cost,
-    ROUND(SUM(total_claim_cost), 2) AS total_claim_cost,
-    COUNT(*) AS encounter_count
-FROM iceberg.healthcare.healthcare_analytics
-WHERE encounter_type IS NOT NULL
+    encounter_class,
+    ROUND(AVG(total_claim_cost), 2)         AS avg_claim_cost,
+    ROUND(SUM(total_claim_cost), 2)         AS total_claim_cost,
+    ROUND(SUM(payer_coverage), 2)           AS total_payer_coverage,
+    ROUND(SUM(patient_out_of_pocket), 2)    AS total_out_of_pocket,
+    COUNT(*)                                AS encounter_count
+FROM iceberg.healthcare.encounter_analytics
+WHERE encounter_class IS NOT NULL
   AND total_claim_cost IS NOT NULL
-GROUP BY encounter_type
+GROUP BY encounter_class
 ORDER BY total_claim_cost DESC;
 
--- Top 20 organizations by encounter count
+-- 4. Top 20 organizations by encounter volume and billing
 SELECT
     organization_name,
-    COUNT(*) AS encounter_count
-FROM iceberg.healthcare.healthcare_analytics
+    organization_city,
+    organization_state,
+    COUNT(*) AS encounter_count,
+    ROUND(SUM(total_claim_cost), 2) AS total_billing
+FROM iceberg.healthcare.encounter_analytics
 WHERE organization_name IS NOT NULL
-GROUP BY organization_name
+GROUP BY organization_name, organization_city, organization_state
 ORDER BY encounter_count DESC
 LIMIT 20;
