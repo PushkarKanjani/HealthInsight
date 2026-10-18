@@ -1,0 +1,28 @@
+﻿version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: healthinsight-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: healthinsight
+    volumes:
+      - mongo_data:/data/db
+
+  trino:
+    image: trinodb/trino:435
+    container_name: healthinsight-trino
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./trino/catalog:/etc/trino/catalog
+      - ./iceberg/warehouse:/warehouse
+    environment:
+      - TRINO_ENVIRONMENT=production
+
+volumes:
+  mongo_data:

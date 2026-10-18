@@ -1,4 +1,4 @@
-﻿# HealthInsight — Version Lock Record (Prompt 01)
+# HealthInsight — Version Lock Record (Prompt 01)
 **Last Updated:** 2026-10-18  
 **Audit Executed by:** Prompt 01 Automated Environment Audit  
 
@@ -21,9 +21,9 @@
 | **MongoDB** | *Not found in PATH* | MongoDB Community 7.0+ | ⚠️ **PENDING** | Install MongoDB Community Server. |
 | **MongoDB Shell** | *Not found in PATH* | mongosh 2.x | ⚠️ **PENDING** | Install MongoDB Shell (`mongosh`). |
 | **MongoDB Spark Connector** | Target: `mongo-spark-connector_2.12-10.4.0.jar` | Mongo Spark Connector for 3.5_2.12 | ⚠️ **PENDING** | Download JAR to local jars folder. |
-| **PySpark (pip)** | *Not installed* | `pyspark==3.5.3` | ⚠️ **PENDING** | `pip install -r requirements.txt`. |
-| **PyMongo (pip)** | *Not installed* | `pymongo==4.10.1` | ⚠️ **PENDING** | `pip install -r requirements.txt`. |
-| **trino-python-client** | *Not installed* | `trino>=0.328.0` | ⚠️ **PENDING** | `pip install -r requirements.txt`. |
+| **PySpark (pip)** | `3.5.3` | `pyspark==3.5.3` | **VERIFIED** | Core distributed computing library installed. |
+| **PyMongo (pip)** | `4.19.0` | `pymongo>=4.8.0` | **VERIFIED** | MongoDB Python client installed. |
+| **trino-python-client** | `0.340.0` | `trino>=0.330.0` | **VERIFIED** | Trino Python client & SQLAlchemy dialect installed. |
 | **Apache Superset** | *Isolated venv required* | Superset 4.0+ in `venv-superset` | ⚠️ **PENDING** | Setup in isolated `venv-superset`. |
 
 ---
