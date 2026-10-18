@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HealthInsight — Clinical AI Command Center</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2300D4FF'><path d='M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z'/></svg>">
+</head>
+<body>
+
+  <!-- WebGL Liquid / Water Flow Cursor Reactive Canvas -->
+  <canvas id="webgl-canvas"></canvas>
+
+  <div class="app-container">
+
+    <!-- Top Sticky Glass Navbar -->
+    <header class="navbar">
+      <a href="#section-copilot" class="nav-brand">
+        <div class="nav-logo-icon">
+          <svg viewBox="0 0 24 24">
+            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
+          </svg>
+        </div>
+        <div>
+          <span class="nav-title text-gradient-cyan">HealthInsight</span>
+          <span class="nav-tag" style="margin-left: 6px;">v2.0 AI</span>
+        </div>
+      </a>
+
+      <ul class="nav-links">
+        <li><a href="#section-copilot" class="nav-link active">🤖 AI Copilot</a></li>
+        <li><a href="#section-explorer" class="nav-link">🔍 Patient Explorer</a></li>
+        <li><a href="#section-monitor" class="nav-link">📡 Lakehouse Monitor</a></li>
+        <li><a href="http://localhost:8088" target="_blank" rel="noopener noreferrer" class="nav-link" style="color: var(--cyan-primary);">📊 Superset BI ↗</a></li>
+      </ul>
+
+      <div class="nav-actions">
+        <div class="status-badge" id="system-status-badge">
+          <span class="pulse-dot"></span>
+          <span>LAKEHOUSE LIVE</span>
+        </div>
+        <button class="btn-ghost" onclick="logout()" title="End Session">
+          <span>Exit</span>
+          <svg style="width:14px;height:14px;fill:currentColor;" viewBox="0 0 24 24"><path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="main-content">
+
+      <!-- Executive KPIs Grid -->
+      <section class="kpi-grid">
+        <div class="glass-panel kpi-card">
+          <div class="kpi-label">
+            <span>Longitudinal Patients</span>
+            <div class="kpi-icon-pill">
+              <svg style="width:18px;height:18px;fill:#00D4FF;" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 3s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+            </div>
+          </div>
+          <div class="kpi-value text-gradient-cyan" id="kpi-patients">12,330</div>
+          <div class="kpi-sub">Synthetic Massachusetts cohort · MITRE Synthea</div>
+        </div>
+
+        <div class="glass-panel kpi-card">
+          <div class="kpi-label">
+            <span>Clinical Encounters</span>
+            <div class="kpi-icon-pill">
+              <svg style="width:18px;height:18px;fill:#8B5CF6;" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>
+            </div>
+          </div>
+          <div class="kpi-value" style="color: #A78BFA;" id="kpi-encounters">321,528</div>
+          <div class="kpi-sub">Partitioned Iceberg table · 1 row per event</div>
+        </div>
+
+        <div class="glass-panel kpi-card">
+          <div class="kpi-label">
+            <span>Gross Billed Claims</span>
+            <div class="kpi-icon-pill">
+              <svg style="width:18px;height:18px;fill:#10B981;" viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
+            </div>
+          </div>
+          <div class="kpi-value" style="color: #34D399;" id="kpi-cost">$41.38M</div>
+          <div class="kpi-sub">Zero-inflation verified · Trino validated</div>
+        </div>
+
+        <div class="glass-panel kpi-card">
+          <div class="kpi-label">
+            <span>Average Claim / Visit</span>
+            <div class="kpi-icon-pill">
+              <svg style="width:18px;height:18px;fill:#F59E0B;" viewBox="0 0 24 24"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg>
+            </div>
+          </div>
+          <div class="kpi-value" style="color: #FBBF24;" id="kpi-duration">$128.71</div>
+          <div class="kpi-sub">Pre-aggregated MongoDB WiredTiger serving</div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           SECTION 1: AI COPILOT
+           ==================================================================== -->
+      <section id="section-copilot">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Ask HealthInsight AI Copilot</h2>
+            <p class="section-subtitle">Ask analytical healthcare questions in plain English — Gemini translates to Trino SQL across 321,528 records.</p>
+          </div>
+          <div style="font-size: 0.8rem; color: var(--cyan-primary); display: flex; align-items: center; gap: 6px;">
+            <svg style="width:14px;height:14px;fill:currentColor;" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+            <span>Trino MPP Engine · Port 8080</span>
+          </div>
+        </div>
+
+        <div class="glass-panel copilot-card">
+          
+          <!-- Copilot Card Header -->
+          <div class="copilot-header">
+            <div class="copilot-header-info">
+              <div class="ai-avatar">
+                <svg viewBox="0 0 24 24"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+              </div>
+              <div>
+                <h3 style="font-size: 1.1rem; color: white;">Clinical Intelligence Engine</h3>
+                <p style="font-size: 0.8rem; color: var(--text-muted);">Grounded on encounter_analytics & condition_analytics tables</p>
+              </div>
+            </div>
+            <div>
+              <span id="ai-status-pill" class="status-badge">
+                <span class="pulse-dot"></span> ONLINE
+              </span>
+            </div>
+          </div>
+
+          <!-- Quick Question Chips -->
+          <div class="chips-bar">
+            <button class="chip-btn" data-question="What are the top 10 most common clinical conditions?">
+              <span>🩺 Top Conditions</span>
+            </button>
+            <button class="chip-btn" data-question="What is the average claim cost and payer coverage by encounter class?">
+              <span>💰 Cost by Class</span>
+            </button>
+            <button class="chip-btn" data-question="What is the demographic breakdown of visits across age groups?">
+              <span>👥 Age Groups</span>
+            </button>
+            <button class="chip-btn" data-question="What is the split of clinical encounters by patient gender?">
+              <span>⚥ Gender Split</span>
+            </button>
+            <button class="chip-btn" data-question="What are the longitudinal monthly encounter trends over time?">
+              <span>📈 Monthly Trends</span>
+            </button>
+            <button class="chip-btn" data-question="Which cities have the highest number of inpatient hospital admissions?">
+              <span>🏥 Inpatient Admissions</span>
+            </button>
+            <button class="chip-btn" data-question="Which hospitals have the highest emergency encounter volume?">
+              <span>🚨 Emergency Volume</span>
+            </button>
+            <button class="chip-btn" data-question="Compare insurance payer coverage versus patient out-of-pocket costs.">
+              <span>💳 Payer vs Out-of-Pocket</span>
+            </button>
+          </div>
+
+          <!-- Chat Conversation Thread -->
+          <div class="chat-thread" id="chat-thread">
+            
+            <!-- Welcome Assistant Message -->
+            <div class="message-item message-ai">
+              <div class="ai-meta-bar">
+                <div class="meta-engine-tag">
+                  <svg style="width:16px;height:16px;fill:currentColor;" viewBox="0 0 24 24"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+                  <span>HealthInsight Clinical Copilot</span>
+                </div>
+                <div class="meta-stats-pill">
+                  Trino 435 · 321,528 Encounters Indexed
+                </div>
+              </div>
+              <div style="color: var(--text-main); font-size: 0.95rem; line-height: 1.6;">
+                Welcome! I am connected to your local Big Data Lakehouse. Click any of the clinical prompt chips above or ask your own question in plain English. I synthesize optimized Trino SQL, execute it over partitioned Iceberg storage, and stream interactive charts and tables in real time.
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Chat Input Bar -->
+          <div class="copilot-input-container">
+            <input type="text" id="chat-input" class="chat-input" placeholder="Ask a clinical question (e.g. 'Which encounter class has the highest claim costs?')...">
+            <button id="btn-send" class="btn-send" title="Send Question">
+              <svg style="width:20px;height:20px;fill:white;" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+            </button>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           SECTION 2: PATIENT EXPLORER
+           ==================================================================== -->
+      <section id="section-explorer">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Patient Journey Explorer</h2>
+            <p class="section-subtitle">Instant lookup of individual patient histories, condition diagnoses, and chronological encounters.</p>
+          </div>
+          <div style="font-size: 0.8rem; color: #10B981; display: flex; align-items: center; gap: 6px;">
+            <span class="pulse-dot"></span>
+            <span>MongoDB 7.0 Serving Layer</span>
+          </div>
+        </div>
+
+        <div class="explorer-search-bar">
+          <input type="text" id="patient-id-input" class="patient-input" placeholder="Enter Patient ID (e.g. fef74b94-c2d9-4e22-bc4f-382c82152126)" value="fef74b94-c2d9-4e22-bc4f-382c82152126">
+          <button id="btn-search-patient" class="btn-primary">
+            🔍 Explore Patient Record
+          </button>
+          <button class="btn-ghost" onclick="document.getElementById('patient-id-input').value='66f888db-3cd2-463e-8fa5-43c50dec2a3c'; lookupPatient('66f888db-3cd2-463e-8fa5-43c50dec2a3c');">
+            Try Patient 2
+          </button>
+        </div>
+
+        <div id="patient-result-container">
+          <!-- Populated by chat.js lookupPatient() -->
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           SECTION 3: LAKEHOUSE MONITOR
+           ==================================================================== -->
+      <section id="section-monitor">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Lakehouse Infrastructure Monitor</h2>
+            <p class="section-subtitle">Real-time health telemetry across the 4 Big Data architecture components.</p>
+          </div>
+          <button class="btn-ghost" onclick="loadSystemHealth(); loadCollectionsList();">
+            ⟳ Refresh Telemetry
+          </button>
+        </div>
+
+        <div class="monitor-grid">
+          
+          <!-- Trino Card -->
+          <div class="glass-panel service-card">
+            <div class="service-card-header">
+              <span class="service-name">Trino 435</span>
+              <span id="trino-status-pill" class="status-badge"><span class="pulse-dot"></span> HEALTHY</span>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">Distributed MPP Query Engine</p>
+            <div class="service-stat-row">
+              <span style="color: var(--text-dim);">Latency</span>
+              <span id="trino-latency" style="color: #38BDF8; font-weight: 600; font-family: monospace;">-- ms</span>
+            </div>
+            <div class="service-stat-row">
+              <span style="color: var(--text-dim);">Records Scanned</span>
+              <span id="trino-records" style="color: white; font-weight: 600;">321,528 rows</span>
+            </div>
+            <div class="service-stat-row">
+              <span style="color: var(--text-dim);">Catalog / Schema</span>
+              <span style="color: var(--text-muted); font-family: monospace;">iceberg.healthcare</span>
+            </div>
+          </div>
+
+          <!-- Iceberg Card -->
+          <div class="glass-panel service-card">
+            <div class="service-card-header">
+              <span class="service-name">Apache Iceberg 1.5</span>
+              <span class="status-badge"><span class="pulse-dot"></span> HEALTHY</span>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">ACID Lakehouse Table Format</p>
+            <div class="service-stat-row">
+              <span style="color: var(--text-dim);">Format Spec</span>
+              <span style="color: #A78BFA; font-weight: 600;">Parquet + Metadata v2</span>
+            </div>
+            <div class="service-stat-row">
+              <span style="color: var(--text-dim);">Lakehouse Tables</span>
+              <span id="iceberg-tables" style="color: white; font-weight: 600;">6 registered</span>
+            </div>
+            <div class="service-stat-row">
+              <span style="color: var(--text-dim);">Storage Substrate</span>
+              <span style="color: var(--text-muted);">Local /warehouse</span>
+            </div>
+          </div>
+
+          <!-- MongoDB Card -->
+          <div class="glass-panel service-card">
+            <div class="service-card-header">
+              <span class="service-name">MongoDB 7.0</span>
+              <span id="mongo-status-pill" class="status-badge"><span class="pulse-dot"></span> HEALTHY</span>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">NoSQL Pre-Aggregated Serving Layer</p>
+            <div class="service-stat-row">
+              <span style="color: var(--text-dim);">Ping Latency</span>
+              <span id="mongo-latency" style="color: #10B981; font-weight: 600; font-family: monospace;">-- ms</span>
+            </div>
+            <div class="service-stat-row">
+              <span style="color: var(--text-dim);">Indexed Collections</span>
+              <span id="mongo-collections" style="color: white; font-weight: 600;">6 collections</span>
+            </div>
+            <div class="service-stat-row">
+              <span style="color: var(--text-dim);">Serving Database</span>
+              <span style="color: var(--text-muted); font-family: monospace;">healthinsight</span>
+            </div>
+          </div>
+
+          <!-- AI Engine Card -->
+          <div class="glass-panel service-card">
+            <div class="service-card-header">
+              <span class="service-name">Clinical AI Engine</span>
+              <span id="ai-status-pill" class="status-badge"><span class="pulse-dot"></span> ONLINE</span>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">Natural Language Text-to-SQL</p>
+            <div class="service-stat-row">
+              <span style="color: var(--text-dim);">Active Engine</span>
+              <span id="ai-engine-name" style="color: #FBBF24; font-weight: 600;">Gemini + Fallback</span>
+            </div>
+            <div class="service-stat-row">
+              <span style="color: var(--text-dim);">Fallback Safeguard</span>
+              <span style="color: #10B981; font-weight: 600;">12 Templates Active</span>
+            </div>
+            <div class="service-stat-row">
+              <span style="color: var(--text-dim);">Safety Guard</span>
+              <span style="color: var(--text-muted);">SELECT-only enforced</span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- MongoDB Collections Inventory Table -->
+        <div class="glass-panel" style="margin-top: 24px; padding: 24px;">
+          <h3 style="color: white; font-size: 1.15rem; margin-bottom: 16px;">MongoDB Serving Layer Inventory</h3>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Collection</th>
+                  <th>Document Count</th>
+                  <th>Clinical Description</th>
+                  <th>Engine</th>
+                </tr>
+              </thead>
+              <tbody id="collections-table-body">
+                <!-- Dynamically populated by monitor.js -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- CDN Dependencies -->
+  <!-- 1. Three.js for WebGL Liquid Water Background -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r160/three.min.js"></script>
+  <!-- 2. Lenis for Apple-grade Smooth Scrolling -->
+  <script src="https://unpkg.com/lenis@1.1.18/dist/lenis.min.js"></script>
+  <!-- 3. Chart.js for Dynamic Clinical Visualizations -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Application Modules -->
+  <script src="/static/auth.js"></script>
+  <script src="/static/three-scene.js"></script>
+  <script src="/static/lenis-scroll.js"></script>
+  <script src="/static/monitor.js"></script>
+  <script src="/static/chat.js"></script>
+
+  <script>
+    // Enforce JWT Auth protection
+    requireAuth();
+
+    // Trigger initial default patient lookup
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        lookupPatient('fef74b94-c2d9-4e22-bc4f-382c82152126');
+      }, 300);
+    });
+  </script>
+
+</body>
+</html>

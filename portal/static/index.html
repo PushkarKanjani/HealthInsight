@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HealthInsight — Clinical AI Command Center</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2300D4FF'><path d='M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z'/></svg>">
+</head>
+<body>
+
+  <!-- WebGL Liquid Cursor Reactive Canvas -->
+  <canvas id="webgl-canvas"></canvas>
+
+  <div class="app-container">
+    <div class="login-wrapper">
+      <div class="glass-panel glass-panel-glow login-card">
+        
+        <div class="login-header">
+          <div style="display: inline-flex; justify-content: center; margin-bottom: 8px;">
+            <div class="nav-logo-icon" style="width: 52px; height: 52px;">
+              <svg viewBox="0 0 24 24" style="width: 28px; height: 28px;">
+                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
+              </svg>
+            </div>
+          </div>
+          <h1 class="login-title text-gradient-cyan">HealthInsight</h1>
+          <p class="login-desc">Clinical AI Command Center · Big Data Lakehouse</p>
+          <div style="margin-top: 8px;">
+            <span class="nav-tag">Spark 3.5 · Iceberg 1.5 · Trino 435 · MongoDB 7.0</span>
+          </div>
+        </div>
+
+        <div id="error-banner" class="error-banner"></div>
+
+        <form id="login-form" class="login-form">
+          <div class="form-group">
+            <label class="form-label" for="username">Operator ID</label>
+            <input type="text" id="username" class="form-input" placeholder="admin" value="admin" required autocomplete="username">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="password">Security Passcode</label>
+            <input type="password" id="password" class="form-input" placeholder="••••••••••••" value="healthinsight2024" required autocomplete="current-password">
+          </div>
+
+          <button type="submit" id="submit-btn" class="btn-primary" style="margin-top: 8px; width: 100%; height: 48px;">
+            <span id="btn-text">Authenticate & Launch</span>
+          </button>
+        </form>
+
+        <div style="text-align: center; font-size: 0.8rem; color: var(--text-dim);">
+          Stateless JWT Session · Role: Clinical Lakehouse Administrator
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Three.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r160/three.min.js"></script>
+  <!-- Three.js Liquid Scene -->
+  <script src="/static/three-scene.js"></script>
+  <!-- Auth Client -->
+  <script src="/static/auth.js"></script>
+
+  <script>
+    // Redirect if already authenticated
+    redirectIfAuthenticated();
+
+    const form = document.getElementById('login-form');
+    const submitBtn = document.getElementById('submit-btn');
+    const btnText = document.getElementById('btn-text');
+    const errorBanner = document.getElementById('error-banner');
+    const loginCard = document.querySelector('.login-card');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorBanner.style.display = 'none';
+      submitBtn.disabled = true;
+      btnText.textContent = 'Verifying credentials...';
+
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+
+      try {
+        const res = await fetch('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          saveSession(data.access_token, data.username);
+          btnText.textContent = 'Session verified! Redirecting...';
+          setTimeout(() => {
+            window.location.href = '/dashboard';
+          }, 350);
+        } else {
+          showError(data.detail || 'Authentication failed.');
+        }
+      } catch (err) {
+        showError('Network connectivity error. Ensure backend server is reachable.');
+      } finally {
+        submitBtn.disabled = false;
+        btnText.textContent = 'Authenticate & Launch';
+      }
+    });
+
+    function showError(msg) {
+      errorBanner.textContent = msg;
+      errorBanner.style.display = 'block';
+      loginCard.classList.remove('shake');
+      void loginCard.offsetWidth; // trigger reflow
+      loginCard.classList.add('shake');
+    }
+  </script>
+
+</body>
+</html>
