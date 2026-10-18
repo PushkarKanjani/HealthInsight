@@ -143,34 +143,42 @@ with app.app_context():
     # Construct standard responsive grid layout
     position_data = {
         "DASHBOARD_VERSION_KEY": "v2",
-        "ROOT_ID": {"children": ["GRID_ID"], "id": "ROOT_ID", "type": "ROOT"},
-        "GRID_ID": {"children": ["ROW_HEADER", "ROW_KPIS", "ROW_CHARTS1", "ROW_CHARTS2"], "id": "GRID_ID", "parents": ["ROOT_ID"], "type": "GRID"},
+        "ROOT_ID": {"children": ["GRID_ID"], "id": "ROOT_ID", "type": "ROOT", "meta": {"background": "BACKGROUND_TRANSPARENT"}},
+        "GRID_ID": {"children": ["ROW_HEADER", "ROW_KPIS", "ROW_CHARTS1", "ROW_CHARTS2"], "id": "GRID_ID", "parents": ["ROOT_ID"], "type": "GRID", "meta": {"background": "BACKGROUND_TRANSPARENT"}},
         
-        "ROW_HEADER": {"children": ["HEADER_TEXT"], "id": "ROW_HEADER", "parents": ["ROOT_ID", "GRID_ID"], "type": "ROW"},
+        "ROW_HEADER": {"children": ["HEADER_TEXT"], "id": "ROW_HEADER", "parents": ["ROOT_ID", "GRID_ID"], "type": "ROW", "meta": {"background": "BACKGROUND_TRANSPARENT"}},
         "HEADER_TEXT": {
             "id": "HEADER_TEXT",
             "parents": ["ROOT_ID", "GRID_ID", "ROW_HEADER"],
             "type": "MARKDOWN",
             "meta": {
                 "width": 12,
-                "code": "### HealthInsight Healthcare Analytics Platform\n> **Notice:** *HealthInsight is a local educational prototype for descriptive analytics over synthetic healthcare records (Synthea). No real patient data or clinical diagnosis.*"
+                "code": "### HealthInsight Healthcare Analytics Platform\n> **Notice:** *HealthInsight is a local educational prototype for descriptive analytics over synthetic healthcare records (Synthea). No real patient data or clinical diagnosis.*",
+                "background": "BACKGROUND_TRANSPARENT"
             }
         },
 
-        "ROW_KPIS": {"children": [f"CHART_{c1.id}", f"CHART_{c2.id}", f"CHART_{c3.id}"], "id": "ROW_KPIS", "parents": ["ROOT_ID", "GRID_ID"], "type": "ROW"},
-        f"CHART_{c1.id}": {"children": [], "id": f"CHART_{c1.id}", "meta": {"chartId": c1.id, "width": 4, "height": 30}, "parents": ["ROOT_ID", "GRID_ID", "ROW_KPIS"], "type": "CHART"},
-        f"CHART_{c2.id}": {"children": [], "id": f"CHART_{c2.id}", "meta": {"chartId": c2.id, "width": 4, "height": 30}, "parents": ["ROOT_ID", "GRID_ID", "ROW_KPIS"], "type": "CHART"},
-        f"CHART_{c3.id}": {"children": [], "id": f"CHART_{c3.id}", "meta": {"chartId": c3.id, "width": 4, "height": 30}, "parents": ["ROOT_ID", "GRID_ID", "ROW_KPIS"], "type": "CHART"},
+        "ROW_KPIS": {"children": [f"CHART_{c1.id}", f"CHART_{c2.id}", f"CHART_{c3.id}"], "id": "ROW_KPIS", "parents": ["ROOT_ID", "GRID_ID"], "type": "ROW", "meta": {"background": "BACKGROUND_TRANSPARENT"}},
+        f"CHART_{c1.id}": {"children": [], "id": f"CHART_{c1.id}", "meta": {"chartId": c1.id, "width": 4, "height": 30, "background": "BACKGROUND_TRANSPARENT"}, "parents": ["ROOT_ID", "GRID_ID", "ROW_KPIS"], "type": "CHART"},
+        f"CHART_{c2.id}": {"children": [], "id": f"CHART_{c2.id}", "meta": {"chartId": c2.id, "width": 4, "height": 30, "background": "BACKGROUND_TRANSPARENT"}, "parents": ["ROOT_ID", "GRID_ID", "ROW_KPIS"], "type": "CHART"},
+        f"CHART_{c3.id}": {"children": [], "id": f"CHART_{c3.id}", "meta": {"chartId": c3.id, "width": 4, "height": 30, "background": "BACKGROUND_TRANSPARENT"}, "parents": ["ROOT_ID", "GRID_ID", "ROW_KPIS"], "type": "CHART"},
 
-        "ROW_CHARTS1": {"children": [f"CHART_{c4.id}", f"CHART_{c5.id}"], "id": "ROW_CHARTS1", "parents": ["ROOT_ID", "GRID_ID"], "type": "ROW"},
-        f"CHART_{c4.id}": {"children": [], "id": f"CHART_{c4.id}", "meta": {"chartId": c4.id, "width": 6, "height": 50}, "parents": ["ROOT_ID", "GRID_ID", "ROW_CHARTS1"], "type": "CHART"},
-        f"CHART_{c5.id}": {"children": [], "id": f"CHART_{c5.id}", "meta": {"chartId": c5.id, "width": 6, "height": 50}, "parents": ["ROOT_ID", "GRID_ID", "ROW_CHARTS1"], "type": "CHART"},
+        "ROW_CHARTS1": {"children": [f"CHART_{c4.id}", f"CHART_{c5.id}"], "id": "ROW_CHARTS1", "parents": ["ROOT_ID", "GRID_ID"], "type": "ROW", "meta": {"background": "BACKGROUND_TRANSPARENT"}},
+        f"CHART_{c4.id}": {"children": [], "id": f"CHART_{c4.id}", "meta": {"chartId": c4.id, "width": 6, "height": 50, "background": "BACKGROUND_TRANSPARENT"}, "parents": ["ROOT_ID", "GRID_ID", "ROW_CHARTS1"], "type": "CHART"},
+        f"CHART_{c5.id}": {"children": [], "id": f"CHART_{c5.id}", "meta": {"chartId": c5.id, "width": 6, "height": 50, "background": "BACKGROUND_TRANSPARENT"}, "parents": ["ROOT_ID", "GRID_ID", "ROW_CHARTS1"], "type": "CHART"},
 
-        "ROW_CHARTS2": {"children": [f"CHART_{c6.id}", f"CHART_{c7.id}"], "id": "ROW_CHARTS2", "parents": ["ROOT_ID", "GRID_ID"], "type": "ROW"},
-        f"CHART_{c6.id}": {"children": [], "id": f"CHART_{c6.id}", "meta": {"chartId": c6.id, "width": 6, "height": 50}, "parents": ["ROOT_ID", "GRID_ID", "ROW_CHARTS2"], "type": "CHART"},
-        f"CHART_{c7.id}": {"children": [], "id": f"CHART_{c7.id}", "meta": {"chartId": c7.id, "width": 6, "height": 50}, "parents": ["ROOT_ID", "GRID_ID", "ROW_CHARTS2"], "type": "CHART"}
+        "ROW_CHARTS2": {"children": [f"CHART_{c6.id}", f"CHART_{c7.id}"], "id": "ROW_CHARTS2", "parents": ["ROOT_ID", "GRID_ID"], "type": "ROW", "meta": {"background": "BACKGROUND_TRANSPARENT"}},
+        f"CHART_{c6.id}": {"children": [], "id": f"CHART_{c6.id}", "meta": {"chartId": c6.id, "width": 6, "height": 50, "background": "BACKGROUND_TRANSPARENT"}, "parents": ["ROOT_ID", "GRID_ID", "ROW_CHARTS2"], "type": "CHART"},
+        f"CHART_{c7.id}": {"children": [], "id": f"CHART_{c7.id}", "meta": {"chartId": c7.id, "width": 6, "height": 50, "background": "BACKGROUND_TRANSPARENT"}, "parents": ["ROOT_ID", "GRID_ID", "ROW_CHARTS2"], "type": "CHART"}
     }
     
     dashboard.position_json = json.dumps(position_data)
+    dashboard.json_metadata = json.dumps({
+        "color_scheme": "supersetColors",
+        "color_namespace": "default",
+        "expanded_slices": {},
+        "refresh_frequency": 0,
+        "timed_refresh_immune_slices": []
+    })
     db.session.commit()
     print("Dashboard layout and charts successfully populated!")
