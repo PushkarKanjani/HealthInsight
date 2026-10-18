@@ -82,29 +82,33 @@ with app.app_context():
         }
     )
 
-    # Chart 4: Encounters by Class (Bar Chart / Echarts)
+    # Chart 4: Encounters by Class (Distribution Bar Chart)
     c4 = get_or_create_slice(
         name="Encounters by Class",
-        viz_type="echarts_timeseries_bar",
+        viz_type="dist_bar",
         datasource=t_enc,
         params={
             "metrics": ["count"],
             "groupby": ["encounter_class"],
             "row_limit": 10,
-            "order_desc": True
+            "order_desc": True,
+            "show_legend": True,
+            "show_bar_value": True
         }
     )
 
-    # Chart 5: Top 10 Recorded Conditions
+    # Chart 5: Top 10 Recorded Conditions (Distribution Bar Chart)
     c5 = get_or_create_slice(
         name="Top 10 Diagnosed Conditions",
-        viz_type="echarts_timeseries_bar",
+        viz_type="dist_bar",
         datasource=t_cond,
         params={
             "metrics": ["count"],
             "groupby": ["condition_description"],
             "row_limit": 10,
-            "order_desc": True
+            "order_desc": True,
+            "show_legend": True,
+            "show_bar_value": True
         }
     )
 
