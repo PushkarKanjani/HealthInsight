@@ -1,159 +1,278 @@
 """
 spark/04_export_mongodb.py
-Phase 4 — Export to MongoDB
-=============================
-Reads the canonical healthcare_analytics Iceberg table, computes
-aggregate DataFrames, and writes them to MongoDB collections using
-the official MongoDB Spark Connector.
+Prompt 11 — Export Analytics Aggregates to MongoDB
+===================================================
+Reads canonical Iceberg analytics tables:
+  - iceberg.healthcare.encounter_analytics
+  - iceberg.healthcare.condition_analytics
+  - iceberg.healthcare.patients
 
-PREREQUISITE: Run 03_transform_healthcare_data.py first.
-PREREQUISITE: MongoDB must be running (mongod).
+Computes aggregated analytics collections and exports them to MongoDB:
+  1. kpis                   (High-level operational and financial KPIs)
+  2. condition_summary      (Condition diagnosis frequencies)
+  3. encounter_type_summary (Encounter class breakdown, duration, and billing)
+  4. encounter_trends       (Monthly longitudinal visit and financial trends)
+  5. demographic_summary    (Demographic distributions by age group & gender)
+  6. organization_summary   (Hospital and clinic visit volumes and billing)
+
+Mandatory Rule:
+  Every document includes `generated_at` and `source_table`.
 """
 
 import os
-from datetime import datetime
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment
+load_dotenv()
+
+# Windows Java & Hadoop binary paths
+if os.getenv("JAVA_HOME"):
+    os.environ["PATH"] = os.path.join(os.getenv("JAVA_HOME"), "bin") + os.pathsep + os.environ.get("PATH", "")
+if os.getenv("HADOOP_HOME"):
+    os.environ["PATH"] = os.path.join(os.getenv("HADOOP_HOME"), "bin") + os.pathsep + os.environ.get("PATH", "")
+
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     col, count, countDistinct, avg, sum as spark_sum,
-    month, year, lit, round as spark_round
+    month, year, round as spark_round, when
 )
-from dotenv import load_dotenv
+import pymongo
 
-load_dotenv()
+project_root = Path(__file__).resolve().parent.parent
+warehouse_dir = os.getenv("ICEBERG_WAREHOUSE", "file:/warehouse")
+iceberg_pkg = os.getenv("ICEBERG_PACKAGE", "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.2")
+mongo_uri = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
+mongo_db_name = os.getenv("MONGODB_DATABASE", "healthinsight")
 
-ICEBERG_WAREHOUSE = os.getenv("ICEBERG_WAREHOUSE", "iceberg/warehouse")
-MONGODB_URI       = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
-MONGODB_DATABASE  = os.getenv("MONGODB_DATABASE", "healthinsight")
-ICEBERG_JAR       = os.getenv("ICEBERG_JAR", "")
-MONGO_JAR         = os.getenv("MONGO_JAR", "")
+now_iso = datetime.now(timezone.utc).isoformat()
 
-JARS = ",".join(filter(None, [ICEBERG_JAR, MONGO_JAR]))
-NOW  = str(datetime.now().isoformat())
+print("\n" + "=" * 80)
+print("  HealthInsight — Export Aggregates to MongoDB (Prompt 11)")
+print("=" * 80)
+print(f"Iceberg Warehouse: {warehouse_dir}")
+print(f"MongoDB Target:    {mongo_uri}/{mongo_db_name}")
 
+# Connect to MongoDB client
+try:
+    mongo_client = pymongo.MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
+    mongo_client.server_info()
+    db = mongo_client[mongo_db_name]
+    print("MongoDB connection verified successfully.")
+except Exception as e:
+    print(f"ERROR: Cannot connect to MongoDB at {mongo_uri}: {e}")
+    sys.exit(1)
+
+# Initialize Spark with Iceberg catalog
 spark = SparkSession.builder \
     .appName("HealthInsight-ExportMongoDB") \
     .master("local[*]") \
-    .config("spark.jars", JARS) \
-    .config("spark.sql.extensions",
-            "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions") \
-    .config("spark.sql.catalog.healthcare",
-            "org.apache.iceberg.spark.SparkCatalog") \
-    .config("spark.sql.catalog.healthcare.type", "hadoop") \
-    .config("spark.sql.catalog.healthcare.warehouse", ICEBERG_WAREHOUSE) \
-    .config("spark.mongodb.write.connection.uri", MONGODB_URI) \
+    .config("spark.driver.memory", "4g") \
+    .config("spark.jars.packages", iceberg_pkg) \
+    .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions") \
+    .config("spark.sql.catalog.iceberg", "org.apache.iceberg.spark.SparkCatalog") \
+    .config("spark.sql.catalog.iceberg.type", "hadoop") \
+    .config("spark.sql.catalog.iceberg.warehouse", warehouse_dir) \
     .getOrCreate()
 
 spark.sparkContext.setLogLevel("WARN")
 
-print("=== Phase 4: MongoDB Export ===")
-print(f"MongoDB URI: {MONGODB_URI}")
-print(f"Database: {MONGODB_DATABASE}")
+def save_to_mongo(spark_df, collection_name, indexes=None):
+    """Converts a Spark DataFrame to Python dictionaries and writes to MongoDB."""
+    records = [row.asDict() for row in spark_df.collect()]
+    coll = db[collection_name]
+    coll.drop()  # Idempotent overwrite
+    if records:
+        coll.insert_many(records)
+    if indexes:
+        for idx in indexes:
+            coll.create_index(idx)
+    count = coll.count_documents({})
+    print(f"  -> Written to MongoDB collection '{collection_name}': {count:,} documents")
+    return count
 
-def write_to_mongo(df, collection):
-    """Write a DataFrame to MongoDB, overwriting the collection."""
-    df.write \
-      .format("mongodb") \
-      .mode("overwrite") \
-      .option("database", MONGODB_DATABASE) \
-      .option("collection", collection) \
-      .save()
-    print(f"  Written: {MONGODB_DATABASE}.{collection} ({df.count():,} documents)")
+# Load canonical analytics tables
+encounter_analytics_df = spark.table("iceberg.healthcare.encounter_analytics")
+condition_analytics_df = spark.table("iceberg.healthcare.condition_analytics")
+patients_df            = spark.table("iceberg.healthcare.patients")
 
-# Load canonical table
-analytics_df = spark.table("healthcare.healthcare_analytics")
-total_rows = analytics_df.count()
-print(f"\nSource table: healthcare.healthcare_analytics ({total_rows:,} rows)")
-
-# ============================================================
-# 1. KPIs (single aggregate document)
-# ============================================================
-print("\n[1/6] Exporting KPIs...")
-kpis_df = analytics_df.agg(
+# ==============================================================================
+# 1. KPIs Collection
+# ==============================================================================
+print("\n[1/6] Computing & Exporting 'kpis'...")
+kpis_df = encounter_analytics_df.agg(
     countDistinct("patient_id").alias("total_patients"),
     count("encounter_id").alias("total_encounters"),
-    spark_round(avg("encounter_duration_days"), 2).alias("avg_duration_days"),
+    spark_round(avg("duration_minutes"), 2).alias("avg_duration_minutes"),
     spark_round(avg("total_claim_cost"), 2).alias("avg_claim_cost"),
-    spark_round(spark_sum("total_claim_cost"), 2).alias("total_cost")
-).withColumn("generated_at", lit(NOW)) \
- .withColumn("source_table", lit("healthcare.healthcare_analytics"))
+    spark_round(spark_sum("total_claim_cost"), 2).alias("total_claim_cost"),
+    spark_round(spark_sum("payer_coverage"), 2).alias("total_payer_coverage"),
+    spark_round(spark_sum("patient_out_of_pocket"), 2).alias("total_out_of_pocket")
+).withColumn("source_table", col("total_patients") * 0 + 1) \
+ .select(
+     col("total_patients"),
+     col("total_encounters"),
+     col("avg_duration_minutes"),
+     col("avg_claim_cost"),
+     col("total_claim_cost"),
+     col("total_payer_coverage"),
+     col("total_out_of_pocket")
+ )
 
-write_to_mongo(kpis_df, "kpis")
+kpi_dict = kpis_df.collect()[0].asDict()
+kpi_dict["source_table"] = "iceberg.healthcare.encounter_analytics"
+kpi_dict["generated_at"] = now_iso
 
-# ============================================================
-# 2. Condition Summary
-# ============================================================
-print("\n[2/6] Exporting condition_summary...")
-condition_df = analytics_df \
+db.kpis.drop()
+db.kpis.insert_one(kpi_dict)
+print(f"  -> Written to MongoDB collection 'kpis': 1 document")
+print(f"     Patients: {kpi_dict['total_patients']:,} | Encounters: {kpi_dict['total_encounters']:,} | Billing: ${kpi_dict['total_claim_cost']:,.2f}")
+
+# ==============================================================================
+# 2. Condition Summary Collection
+# ==============================================================================
+print("\n[2/6] Computing & Exporting 'condition_summary'...")
+condition_summary_df = condition_analytics_df \
     .filter(col("condition_description").isNotNull()) \
-    .groupBy("condition_description") \
+    .groupBy("condition_code", "condition_description") \
     .agg(count("*").alias("frequency")) \
-    .withColumn("generated_at", lit(NOW)) \
-    .withColumn("source_table", lit("healthcare.healthcare_analytics")) \
     .orderBy(col("frequency").desc())
 
-write_to_mongo(condition_df, "condition_summary")
+condition_records = []
+for row in condition_summary_df.collect():
+    d = row.asDict()
+    d["source_table"] = "iceberg.healthcare.condition_analytics"
+    d["generated_at"] = now_iso
+    condition_records.append(d)
 
-# ============================================================
-# 3. Demographic Summary
-# ============================================================
-print("\n[3/6] Exporting demographic_summary...")
-demo_df = analytics_df \
-    .groupBy("gender", "age_group", "race", "ethnicity") \
-    .agg(count("*").alias("encounter_count")) \
-    .withColumn("generated_at", lit(NOW))
+db.condition_summary.drop()
+if condition_records:
+    db.condition_summary.insert_many(condition_records)
+db.condition_summary.create_index([("condition_description", pymongo.ASCENDING)])
+db.condition_summary.create_index([("frequency", pymongo.DESCENDING)])
+print(f"  -> Written to MongoDB collection 'condition_summary': {len(condition_records):,} documents")
 
-write_to_mongo(demo_df, "demographic_summary")
-
-# ============================================================
-# 4. Encounter Type Summary
-# ============================================================
-print("\n[4/6] Exporting encounter_type_summary...")
-enc_type_df = analytics_df \
-    .filter(col("encounter_type").isNotNull()) \
-    .groupBy("encounter_type") \
+# ==============================================================================
+# 3. Encounter Type Summary Collection
+# ==============================================================================
+print("\n[3/6] Computing & Exporting 'encounter_type_summary'...")
+enc_type_df = encounter_analytics_df \
+    .filter(col("encounter_class").isNotNull()) \
+    .groupBy("encounter_class") \
     .agg(
         count("*").alias("encounter_count"),
-        spark_round(avg("encounter_duration_days"), 2).alias("avg_duration_days"),
-        spark_round(avg("total_claim_cost"), 2).alias("avg_claim_cost")
-    ) \
-    .withColumn("generated_at", lit(NOW))
+        spark_round(avg("duration_minutes"), 2).alias("avg_duration_minutes"),
+        spark_round(avg("total_claim_cost"), 2).alias("avg_claim_cost"),
+        spark_round(spark_sum("total_claim_cost"), 2).alias("total_claim_cost"),
+        spark_round(spark_sum("payer_coverage"), 2).alias("total_payer_coverage"),
+        spark_round(spark_sum("patient_out_of_pocket"), 2).alias("total_out_of_pocket")
+    ).orderBy(col("encounter_count").desc())
 
-write_to_mongo(enc_type_df, "encounter_type_summary")
+enc_type_records = []
+for row in enc_type_df.collect():
+    d = row.asDict()
+    d["source_table"] = "iceberg.healthcare.encounter_analytics"
+    d["generated_at"] = now_iso
+    enc_type_records.append(d)
 
-# ============================================================
-# 5. Encounter Trends (monthly)
-# ============================================================
-print("\n[5/6] Exporting encounter_trends...")
-trends_df = analytics_df \
-    .filter(col("encounter_start").isNotNull()) \
-    .withColumn("year", year("encounter_start")) \
-    .withColumn("month", month("encounter_start")) \
+db.encounter_type_summary.drop()
+if enc_type_records:
+    db.encounter_type_summary.insert_many(enc_type_records)
+db.encounter_type_summary.create_index([("encounter_class", pymongo.ASCENDING)])
+db.encounter_type_summary.create_index([("encounter_count", pymongo.DESCENDING)])
+print(f"  -> Written to MongoDB collection 'encounter_type_summary': {len(enc_type_records):,} documents")
+
+# ==============================================================================
+# 4. Encounter Trends Collection
+# ==============================================================================
+print("\n[4/6] Computing & Exporting 'encounter_trends'...")
+trends_df = encounter_analytics_df \
+    .filter(col("start_time").isNotNull()) \
+    .withColumn("year", year("start_time")) \
+    .withColumn("month", month("start_time")) \
     .groupBy("year", "month") \
-    .agg(count("*").alias("encounter_count")) \
-    .withColumn("generated_at", lit(NOW)) \
-    .orderBy("year", "month")
+    .agg(
+        count("*").alias("encounter_count"),
+        spark_round(spark_sum("total_claim_cost"), 2).alias("total_claim_cost"),
+        spark_round(avg("total_claim_cost"), 2).alias("avg_claim_cost")
+    ).orderBy("year", "month")
 
-write_to_mongo(trends_df, "encounter_trends")
+trends_records = []
+for row in trends_df.collect():
+    d = row.asDict()
+    d["source_table"] = "iceberg.healthcare.encounter_analytics"
+    d["generated_at"] = now_iso
+    trends_records.append(d)
 
-# ============================================================
-# 6. Organization Summary
-# ============================================================
-print("\n[6/6] Exporting organization_summary...")
-org_df = analytics_df \
+db.encounter_trends.drop()
+if trends_records:
+    db.encounter_trends.insert_many(trends_records)
+db.encounter_trends.create_index([("year", pymongo.ASCENDING), ("month", pymongo.ASCENDING)])
+print(f"  -> Written to MongoDB collection 'encounter_trends': {len(trends_records):,} documents")
+
+# ==============================================================================
+# 5. Demographic Summary Collection
+# ==============================================================================
+print("\n[5/6] Computing & Exporting 'demographic_summary'...")
+demo_df = encounter_analytics_df \
+    .filter(col("age_group").isNotNull()) \
+    .groupBy("patient_gender", "age_group", "patient_race", "patient_ethnicity") \
+    .agg(
+        countDistinct("patient_id").alias("distinct_patients"),
+        count("encounter_id").alias("encounter_count"),
+        spark_round(spark_sum("total_claim_cost"), 2).alias("total_claim_cost")
+    ).orderBy(col("encounter_count").desc())
+
+demo_records = []
+for row in demo_df.collect():
+    d = row.asDict()
+    d["source_table"] = "iceberg.healthcare.encounter_analytics"
+    d["generated_at"] = now_iso
+    demo_records.append(d)
+
+db.demographic_summary.drop()
+if demo_records:
+    db.demographic_summary.insert_many(demo_records)
+db.demographic_summary.create_index([("patient_gender", pymongo.ASCENDING), ("age_group", pymongo.ASCENDING)])
+print(f"  -> Written to MongoDB collection 'demographic_summary': {len(demo_records):,} documents")
+
+# ==============================================================================
+# 6. Organization Summary Collection
+# ==============================================================================
+print("\n[6/6] Computing & Exporting 'organization_summary'...")
+org_df = encounter_analytics_df \
     .filter(col("organization_name").isNotNull()) \
-    .groupBy("organization_id", "organization_name") \
+    .groupBy("organization_id", "organization_name", "organization_city", "organization_state") \
     .agg(
         count("encounter_id").alias("total_encounters"),
+        spark_round(spark_sum("total_claim_cost"), 2).alias("total_billing"),
         spark_round(avg("total_claim_cost"), 2).alias("avg_cost")
-    ) \
-    .withColumn("generated_at", lit(NOW)) \
-    .orderBy(col("total_encounters").desc())
+    ).orderBy(col("total_encounters").desc())
 
-write_to_mongo(org_df, "organization_summary")
+org_records = []
+for row in org_df.collect():
+    d = row.asDict()
+    d["source_table"] = "iceberg.healthcare.encounter_analytics"
+    d["generated_at"] = now_iso
+    org_records.append(d)
 
-print("\n=== MongoDB Export Complete ===")
-print(f"All collections written to database: {MONGODB_DATABASE}")
-print("\nNEXT STEP: Run mongodb/indexes.js to create indexes.")
-print("           Then run mongodb/validation_queries.js to verify.")
+db.organization_summary.drop()
+if org_records:
+    db.organization_summary.insert_many(org_records)
+db.organization_summary.create_index([("organization_name", pymongo.ASCENDING)])
+db.organization_summary.create_index([("total_encounters", pymongo.DESCENDING)])
+print(f"  -> Written to MongoDB collection 'organization_summary': {len(org_records):,} documents")
+
+print("\n" + "=" * 80)
+print("  MongoDB Collections in 'healthinsight':")
+print("=" * 80)
+for c in db.list_collection_names():
+    print(f"  - {c}: {db[c].count_documents({}):,} documents")
 
 spark.stop()
+
+print("\n" + "=" * 80)
+print("  PROMPT 11 MONGODB EXPORT COMPLETE (Exit Code 0)")
+print("=" * 80 + "\n")
