@@ -1,62 +1,62 @@
-#!/bin/bash
-# scripts/run_spark_pipeline.sh
-# Runs all four Spark phases in sequence.
-# Stop on any failure (set -e).
+#!/usr/bin/env bash
+# ==============================================================================
+# HealthInsight — Full Automated Big Data Pipeline (Prompt 15)
+# Engine Order: Spark Profiler -> Iceberg Ingest -> Analytics Marts -> MongoDB -> Trino Validation
+# ==============================================================================
 
-set -e
+set -euo pipefail
 
-# Load environment
-if [ -f .env ]; then
-  export $(grep -v '^#' .env | xargs)
-else
-  echo "ERROR: .env file not found. Copy .env.example to .env and configure it."
-  exit 1
-fi
+echo "================================================================================"
+echo "  HealthInsight — Big Data End-to-End Pipeline Execution"
+echo "================================================================================"
 
-SPARK_SUBMIT="$SPARK_HOME/bin/spark-submit"
-JARS="$ICEBERG_JAR,$MONGO_JAR"
-
-echo "==================================================================="
-echo "  HealthInsight Spark Pipeline"
-echo "==================================================================="
-
-# ---- Phase 1: Profile ----
+# Step 0: Ensure Docker services are running
 echo ""
-echo "[Phase 1] Profiling dataset..."
-$SPARK_SUBMIT \
-  --master local[*] \
-  spark/01_profile_dataset.py
-echo "Phase 1 complete."
+echo "[Step 0/5] Verifying Infrastructure Services..."
+docker compose up -d trino mongodb
 
-# ---- Phase 2: Create Iceberg Tables ----
+# Step 1: Profile Source Dataset
 echo ""
-echo "[Phase 2] Creating Iceberg tables..."
-$SPARK_SUBMIT \
-  --master local[*] \
-  --jars "$JARS" \
-  spark/02_create_iceberg_tables.py
-echo "Phase 2 complete."
+echo "[Step 1/5] Running Spark Dataset Profiler..."
+python spark/01_profile_dataset.py
 
-# ---- Phase 3: Transform ----
+# Step 2: Ingest Raw CSVs into Iceberg
 echo ""
-echo "[Phase 3] Running transformations..."
-$SPARK_SUBMIT \
-  --master local[*] \
-  --jars "$JARS" \
-  spark/03_transform_healthcare_data.py
-echo "Phase 3 complete."
+echo "[Step 2/5] Ingesting Raw CSVs into Apache Iceberg..."
+python spark/02_ingest_raw_to_iceberg.py
 
-# ---- Phase 4: Export to MongoDB ----
+# Step 3: Build Curated Analytical Tables
 echo ""
-echo "[Phase 4] Exporting to MongoDB..."
-$SPARK_SUBMIT \
-  --master local[*] \
-  --jars "$JARS" \
-  spark/04_export_mongodb.py
-echo "Phase 4 complete."
+echo "[Step 3/5] Constructing Analytical Iceberg Datamarts..."
+python spark/03_build_analytics_tables.py
+
+# Register tables in Trino
+echo ""
+echo "Registering tables in Trino..."
+docker exec healthinsight-trino trino --execute "
+CALL iceberg.system.register_table(schema_name => 'healthcare', table_name => 'patients', table_location => 'file:/warehouse/healthcare/patients');
+CALL iceberg.system.register_table(schema_name => 'healthcare', table_name => 'encounters', table_location => 'file:/warehouse/healthcare/encounters');
+CALL iceberg.system.register_table(schema_name => 'healthcare', table_name => 'conditions', table_location => 'file:/warehouse/healthcare/conditions');
+CALL iceberg.system.register_table(schema_name => 'healthcare', table_name => 'organizations', table_location => 'file:/warehouse/healthcare/organizations');
+CALL iceberg.system.register_table(schema_name => 'healthcare', table_name => 'encounter_analytics', table_location => 'file:/warehouse/healthcare/encounter_analytics');
+CALL iceberg.system.register_table(schema_name => 'healthcare', table_name => 'condition_analytics', table_location => 'file:/warehouse/healthcare/condition_analytics');
+" || true
+
+# Step 4: Export Serving Layer Aggregates to MongoDB
+echo ""
+echo "[Step 4/5] Exporting Analytics Aggregates to MongoDB..."
+python spark/04_export_mongodb.py
+
+# Step 5: Verify Trino Visibility
+echo ""
+echo "[Step 5/5] Running Trino SQL Validation Suite..."
+docker exec healthinsight-trino trino --execute "
+SHOW TABLES FROM iceberg.healthcare;
+SELECT 'encounter_analytics' AS table_name, COUNT(*) AS total_rows FROM iceberg.healthcare.encounter_analytics;
+SELECT 'condition_analytics' AS table_name, COUNT(*) AS total_rows FROM iceberg.healthcare.condition_analytics;
+"
 
 echo ""
-echo "==================================================================="
-echo "  Pipeline finished successfully."
-echo "  Next: Run Trino SQL queries and verify MongoDB collections."
-echo "==================================================================="
+echo "================================================================================"
+echo "  HEALTHINSIGHT PIPELINE EXECUTION FINISHED SUCCESSFULLY (Exit Code 0)"
+echo "================================================================================"
