@@ -1,4 +1,4 @@
-﻿version: '3.8'
+version: '3.8'
 
 services:
   mongodb:
@@ -24,5 +24,22 @@ services:
     environment:
       - TRINO_ENVIRONMENT=production
 
+  superset:
+    build:
+      context: ./superset
+      dockerfile: Dockerfile
+    image: healthinsight-superset:latest
+    container_name: healthinsight-superset
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+    environment:
+      - SUPERSET_SECRET_KEY=healthinsight_secret_key_bda_2026_salt
+    volumes:
+      - superset_home:/app/superset_home
+    depends_on:
+      - trino
+
 volumes:
   mongo_data:
+  superset_home:
