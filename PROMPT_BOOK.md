@@ -1,4 +1,4 @@
-﻿# HealthInsight Prompt Book
+# HealthInsight Prompt Book
 
 ## Purpose
 This document is the controlled instruction book for building, testing, documenting, and presenting the HealthInsight project.
@@ -909,5 +909,201 @@ HealthInsight is complete only when all of the following are true:
 ---
 
 ## Current Next Prompt
-Run **Prompt 00 — Project Context Confirmation** first.  
-Do not ask Antigravity to build additional features until the audit is complete.
+Prompts 00–22 are COMPLETE. The v1 Lakehouse is FROZEN.  
+Proceed with **Prompt 23** to build the v2 AI Clinical Command Center.
+
+---
+
+---
+
+# PART 2 — HealthInsight v2: AI Clinical Command Center (Prompts 23–32)
+
+## v2 Vision
+Transform the HealthInsight Lakehouse into a premium, AI-powered Clinical Intelligence Platform with a glassmorphic Three.js-animated, JWT-authenticated web portal. Healthcare professionals ask questions in plain English and receive distributed analytics answers from Trino and MongoDB.
+
+## v2 Non-Negotiable Rules
+1. Zero disruption to v1 (no edits to `spark/`, `trino/`, `docker-compose.yml`, Iceberg warehouse).
+2. SQL injection guard: reject any non-SELECT statement before Trino execution.
+3. 12 clinical fallback queries must work 100% offline without any API key.
+4. JWT required on all `/api/*` routes. Default credentials: `admin` / `healthinsight2024`.
+5. Gemini API key stored in `.env` only, never in source code.
+6. Every rendered number must be from live Trino or MongoDB — no hardcoded values.
+
+---
+
+## Prompt 23 — Backend Foundation (FastAPI + JWT Auth)
+
+### Instruction to Antigravity
+Create the FastAPI backend gateway at `portal/server.py` and `portal/auth.py`.
+
+**Endpoints required:**
+- `POST /auth/login` — accepts `{"username": "admin", "password": "healthinsight2024"}`, returns `{"access_token": "<jwt>", "token_type": "bearer"}`.
+- `GET /api/health` — JWT required. Returns JSON status of Trino, MongoDB, and AI engine.
+
+**Rules:**
+- CORS must allow `http://localhost:5000` and `http://127.0.0.1:5000`.
+- JWT expiry: 8 hours. Secret from `.env` variable `PORTAL_JWT_SECRET`.
+- Start with `uvicorn portal.server:app --port 5000 --reload`.
+
+**Verify:** `POST /auth/login` returns JWT. `GET /api/health` with Bearer token returns `{"trino": "ok", "mongodb": "ok"}`.
+
+---
+
+## Prompt 24 — Query Engine + Trino Integration
+
+### Instruction to Antigravity
+Create `portal/query_engine.py` and `portal/schema_context.py`.
+
+**Deliverables:**
+- `POST /api/query/sql` — JWT required. Accepts `{"sql": "SELECT ..."}`. Validates SELECT-only. Executes via Trino. Returns `{"columns": [...], "rows": [...], "execution_ms": 412}`.
+- SQL safety guard: if the SQL contains `DROP`, `INSERT`, `UPDATE`, `DELETE`, `CREATE`, or `TRUNCATE` (case-insensitive), return `{"error": "Only SELECT queries are permitted"}` with HTTP 400.
+- `schema_context.py` must contain exact column names and types of `encounter_analytics` and `condition_analytics` as a formatted string for injection into AI prompts.
+
+**Verify:** POST `SELECT COUNT(*) FROM iceberg.healthcare.encounter_analytics` → returns `{"rows": [[321528]]}`.
+
+---
+
+## Prompt 25 — Gemini AI Text-to-SQL Engine + Deterministic Fallback
+
+### Instruction to Antigravity
+Create `portal/ai_engine.py`.
+
+**Deliverables:**
+- `POST /api/query/natural` — JWT required. Accepts `{"question": "What are the top 5 conditions?"}`.
+- Returns `{"generated_sql": "SELECT ...", "columns": [...], "rows": [...], "execution_ms": 412, "engine": "gemini" | "fallback"}`.
+- Gemini API: Use `google-genai` SDK (`google.genai`). Model: `gemini-2.0-flash`. API key from `.env` variable `GEMINI_API_KEY`.
+- Fallback engine: 12 keyword-matched clinical query templates. Triggers if API key is absent, API fails, or `engine=fallback` is forced.
+- Inject full schema context into every Gemini system prompt.
+
+**The 12 fallback queries must cover:** top conditions, encounter class distribution, age group breakdown, gender split, monthly trends, inpatient cost, average duration, wellness visits, emergency count, organization volume, payer vs out-of-pocket, and yearly patient count.
+
+**Verify:** Works with no `GEMINI_API_KEY` set → fallback engine returns real Trino data.
+
+---
+
+## Prompt 26 — MongoDB Service Layer
+
+### Instruction to Antigravity
+Create `portal/mongo_service.py`.
+
+**Endpoints:**
+- `GET /api/kpis` — returns the single document from `healthinsight.kpis` collection.
+- `GET /api/collections` — returns document counts for all 6 collections.
+- `GET /api/patient/{patient_id}` — queries MongoDB and Trino to return patient demographics + encounter summary + top conditions.
+
+**Verify:** `GET /api/kpis` returns in <10ms. `GET /api/patient/abc` returns a structured patient card.
+
+---
+
+## Prompt 27 — Design System CSS + Three.js Liquid Cursor
+
+### Instruction to Antigravity
+Create `portal/static/style.css` and `portal/static/three-scene.js`.
+
+**CSS Design System:**
+- Tokens: `--bg-canvas: #050B18`, `--glass-bg: rgba(255,255,255,0.04)`, `--glass-border: rgba(255,255,255,0.08)`, `--accent-cyan: #00D4FF`, `--accent-violet: #7C3AED`, `--success: #10B981`, `--text-primary: #F0F6FF`, `--text-secondary: #94A3B8`.
+- Glassmorphism card: `background: var(--glass-bg); backdrop-filter: blur(24px); border: 1px solid var(--glass-border); border-radius: 16px`.
+- Smooth transitions on all hover states.
+- Lenis scroll imported from CDN.
+
+**Three.js Scene:**
+- 8,000 particles in a deep navy field.
+- On mouse move: particles within 120px radius are repelled and flow away fluidly.
+- Particles return to base position elastically using lerp.
+- Must render on a `<canvas id="bg-canvas">` positioned fixed behind all content.
+
+**Verify:** Open the HTML file in browser → 60fps particle field visible with mouse-reactive flow.
+
+---
+
+## Prompt 28 — Login Page (Glassmorphic + Three.js + JWT)
+
+### Instruction to Antigravity
+Create `portal/static/index.html` and `portal/static/auth.js`.
+
+**Deliverables:**
+- Full-screen login card centered over Three.js animated canvas.
+- Logo: "HealthInsight" in Outfit 700, cyan gradient.
+- Tagline: "Clinical AI Command Center — Powered by Apache Spark · Iceberg · Trino · MongoDB".
+- Username and password inputs, glassmorphic style.
+- Login button: cyan gradient with loading spinner during API call.
+- On success: store JWT in `localStorage` as `hi_token`, redirect to `dashboard.html`.
+- On failure: shake animation on card + red error message.
+- JWT auto-redirect: if `hi_token` already valid, skip login and go to dashboard.
+
+**Verify:** Login with wrong credentials → red error shown. Correct login → JWT in localStorage → dashboard loads.
+
+---
+
+## Prompt 29 — Dashboard Shell + Lenis Scroll + Status Monitor
+
+### Instruction to Antigravity
+Create `portal/static/dashboard.html` and `portal/static/monitor.js`.
+
+**Deliverables:**
+- Fixed header: HealthInsight logo, nav links (Copilot / Monitor / Explorer), user badge ("admin"), logout button.
+- Three sections scrollable with Lenis: `#section-copilot`, `#section-monitor`, `#section-explorer`.
+- Monitor section: 4 status cards (Trino, Iceberg, MongoDB, AI Engine). Poll `GET /api/health` every 30 seconds.
+- Three.js background canvas visible beneath all content.
+- JWT guard: if no valid `hi_token` in localStorage, redirect to `index.html`.
+
+**Verify:** All status cards show HEALTHY on page load. Logout button clears token and redirects.
+
+---
+
+## Prompt 30 — AI Copilot Chat Interface + Chart.js
+
+### Instruction to Antigravity
+Build the complete AI Copilot section inside `dashboard.html` with JavaScript in the same file or a linked `chat.js`.
+
+**Deliverables:**
+- 8 quick-chip buttons: "Top 10 Conditions", "Cost by Encounter Class", "Age Group Breakdown", "Gender Distribution", "Monthly Encounter Trends", "Inpatient vs Emergency", "Organization Volume", "Payer vs Out-of-Pocket".
+- Chat thread: user bubble (right, cyan), AI response bubble (left, glass card).
+- Each AI response shows:
+  1. SQL code block with syntax highlighting (cyan keywords).
+  2. `⚡ X.XXs | 321,528 rows scanned` execution badge.
+  3. Sortable HTML data table (first 20 rows).
+  4. Chart.js visualization (auto-selected: bar for categorical, line for temporal, donut for proportional).
+  5. "📋 Copy SQL" button, "⬇️ Export CSV" button.
+- Loading state: animated pulse skeleton while waiting for API response.
+- Error state: red glass card with error message and retry button.
+
+**Verify:** Type "which age group has the most encounters" → real Trino data appears as both table and chart.
+
+---
+
+## Prompt 31 — Patient Explorer Section
+
+### Instruction to Antigravity
+Build the Patient Explorer section inside the dashboard.
+
+**Deliverables:**
+- Search input: "Enter synthetic patient ID". Submit button.
+- On submit: call `GET /api/patient/{id}`.
+- Render a glassmorphic patient card:
+  - Demographics: Age, Gender, Race, Ethnicity, City, State.
+  - Stats: Total encounters, total claim cost, avg cost per visit.
+  - Top 5 conditions (from condition_analytics via Trino).
+  - Mini timeline: last 5 encounters with class, date, and cost.
+- Empty state: "Enter a patient ID to explore their longitudinal clinical journey."
+- Error state: "Patient not found in the synthetic dataset."
+
+**Verify:** A known synthetic patient ID returns full card in under 100ms.
+
+---
+
+## Prompt 32 — Final Integration, Scripts & Git Freeze
+
+### Instruction to Antigravity
+Complete the integration and freeze the v2 portal.
+
+**Deliverables:**
+- `scripts/start_portal.ps1` — PowerShell one-liner: `uvicorn portal.server:app --port 5000 --reload`.
+- `scripts/start_portal.sh` — Bash equivalent.
+- Update `README.md` with v2 section: new architecture diagram, portal start command, login URL, and Gemini API key setup.
+- Update `docs/final_handover.md` with portal URL `http://localhost:5000`.
+- Stage all portal files and commit with message `feat(portal): complete v2 ai portal integration and documentation freeze`.
+- Push to `origin main`.
+
+**Verify:** `python -m uvicorn portal.server:app --port 5000` → `http://localhost:5000` loads login page → full demo flow completes end-to-end.
+

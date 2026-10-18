@@ -1,6 +1,6 @@
-version: '3.8'
-
 services:
+  # ── v1 Lakehouse Infrastructure ─────────────────────────────────────────────
+
   mongodb:
     image: mongo:7.0
     container_name: healthinsight-mongodb
@@ -39,6 +39,25 @@ services:
       - superset_home:/app/superset_home
     depends_on:
       - trino
+
+  # ── v2 AI Clinical Command Center ───────────────────────────────────────────
+  # NOTE: The portal runs on the HOST (not Docker) to share Python venv.
+  # Start manually: python -m uvicorn portal.server:app --port 5000 --reload
+  #
+  # Uncomment the block below ONLY if you want to Dockerize the portal later:
+  #
+  # portal:
+  #   build:
+  #     context: ./portal
+  #     dockerfile: Dockerfile
+  #   container_name: healthinsight-portal
+  #   restart: unless-stopped
+  #   ports:
+  #     - "5000:5000"
+  #   env_file: .env
+  #   depends_on:
+  #     - trino
+  #     - mongodb
 
 volumes:
   mongo_data:

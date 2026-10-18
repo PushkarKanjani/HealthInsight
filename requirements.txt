@@ -1,23 +1,42 @@
-# HealthInsight Python Dependencies
-# Update version numbers to match your actual installed versions after verification.
+# HealthInsight — Project Requirements (v2)
+# Updated: October 2026
+# Version: 2.0.0 (v1 Lakehouse + v2 AI Portal)
 
-# PySpark — must match installed Apache Spark version exactly
+# ==============================================================================
+# v1 LAKEHOUSE PIPELINE DEPENDENCIES (Do not modify versions)
+# ==============================================================================
+
+# Distributed ETL engine
 pyspark==3.5.3
 
 # MongoDB Python client
 pymongo==4.8.0
 
-# Trino Python client (for Superset connection and validation scripts)
-trino==0.330.0
+# Trino Python client (Lakehouse SQL engine)
+trino==0.340.0
 
-# Data processing
+# Data processing utilities
 pandas==2.2.2
 pyarrow==16.1.0
 
-# Environment management
+# Environment configuration
 python-dotenv==1.0.1
 
-# Apache Superset (install separately in its own virtual environment)
-# apache-superset==4.0.1
-# flask==2.3.3
-# gunicorn==21.2.0
+# ==============================================================================
+# v2 AI COMMAND CENTER PORTAL DEPENDENCIES
+# ==============================================================================
+
+# FastAPI async web framework (portal backend)
+fastapi==0.115.0
+
+# ASGI server for FastAPI
+uvicorn[standard]==0.32.0
+
+# JWT authentication (stateless auth tokens)
+PyJWT==2.10.1
+
+# Google Gemini AI SDK (Text-to-SQL engine)
+google-genai==1.21.0
+
+# HTTP client for async API calls
+httpx==0.28.1

@@ -42,3 +42,9 @@ Thumbs.db
 
 # Zip archives
 *.zip
+
+# v2 Portal
+portal/__pycache__/
+portal/static/.DS_Store
+portal/.pytest_cache/
+

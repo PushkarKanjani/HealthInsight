@@ -1,99 +1,164 @@
-# HealthInsight — Final Project Handover & Freeze Record (Prompt 22)
+# HealthInsight — Final Handover Document
 
-**Handover Date:** October 18, 2026  
-**Project State:** **FROZEN (Implementation Complete)**  
-**Version:** 1.0.0-final  
-
----
-
-## 1. Final Architecture
-
-HealthInsight implements a 4-tier decoupled Big Data Lakehouse architecture:
-
-```
-[Synthea CSV Tier] (12,352 patients, 321,528 encounters, 114,544 conditions, 5,499 orgs)
-         │
-         ▼
-[1. Apache Spark 3.5] (Batch Distributed ETL, Schema Enforcement, Age Derivation, Cost Integrity)
-         ├──► [2. Apache Iceberg 1.5] (Lakehouse Storage Format, Parquet + Metadata Pruning)
-         │           │
-         │           ▼
-         │    [3. Trino 435] (Distributed Interactive SQL Engine, Sub-Second OLAP)
-         │           │
-         │           ▼
-         │    [Apache Superset 3.1] (Presentation BI UI: Clinical Daylight Dashboard)
-         │
-         └──► [4. MongoDB 7.0] (NoSQL Operational Serving Store: 6 Pre-Aggregated Collections)
-```
+**Last Updated:** October 18, 2026
+**Status:** v1 FROZEN | v2 IN PROGRESS
 
 ---
 
-## 2. Verified Installed Versions
+## Quick Reference — Service URLs
 
-- **Host OS:** Windows 11 Home Single Language (Build 26100)
-- **Container Runtime:** Docker Desktop (WSL2 Backend)
-- **Python:** 3.11.9
-- **Apache Spark:** 3.5.3 (PySpark 3.5.3)
-- **Apache Iceberg:** 1.5.2 (`iceberg-spark-runtime-3.5_2.12:1.5.2`)
-- **Trino:** 435 (Docker image `trinodb/trino:435`)
-- **MongoDB:** 7.0 Community (Docker image `mongo:7.0`)
-- **Apache Superset:** 3.1.0 with `trino-0.340.0` (Docker image `healthinsight-superset:latest`)
-
----
-
-## 3. Quick Start & Execution Commands
-
-### Step 1: Start Container Services
-```bash
-docker compose up -d trino mongodb superset
-```
-
-### Step 2: Run Automated End-to-End Pipeline
-On Windows PowerShell:
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/run_pipeline.ps1
-```
-On Linux / macOS:
-```bash
-bash scripts/run_pipeline.sh
-```
-
-### Step 3: Interactive Verification Interfaces
-- **Apache Superset Dashboard:** [http://localhost:8088](http://localhost:8088) (Username: `admin` | Password: `admin`)
-- **Trino Distributed SQL:** Connect via DBeaver Community or Trino CLI at `localhost:8080` (Catalog: `iceberg`, Schema: `healthcare`, User: `admin`).
-- **MongoDB NoSQL Shell:** `mongosh mongodb://localhost:27017/healthinsight`
-
----
-
-## 4. Key Evidence & Documentation Index
-
-| Documentation / Artifact | Description | File Link |
+| Service | URL | Credentials |
 |---|---|---|
-| **System Architecture** | Full architectural blueprints and component breakdowns | [docs/architecture.md](file:///c:/MyDrive/SEM-7/BigData/BDA_PROJECT/HealthInsight/docs/architecture.md) |
-| **Data Lineage** | Ingestion-to-visualization field and transformation tracking | [docs/data_lineage.md](file:///c:/MyDrive/SEM-7/BigData/BDA_PROJECT/HealthInsight/docs/data_lineage.md) |
-| **Dataset Dictionary** | Profiled column types, null counts, and value distributions | [docs/dataset_dictionary.md](file:///c:/MyDrive/SEM-7/BigData/BDA_PROJECT/HealthInsight/docs/dataset_dictionary.md) |
-| **Version Lock** | Pinned runtime dependencies and JAR compatibility table | [docs/version_lock.md](file:///c:/MyDrive/SEM-7/BigData/BDA_PROJECT/HealthInsight/docs/version_lock.md) |
-| **End-to-End Verification** | Proof matrix of 10 verification checks across all tiers | [docs/end_to_end_verification.md](file:///c:/MyDrive/SEM-7/BigData/BDA_PROJECT/HealthInsight/docs/end_to_end_verification.md) |
-| **Screenshot Checklist** | Step-by-step checklist of 17 viva presentation screenshots | [docs/screenshot_checklist.md](file:///c:/MyDrive/SEM-7/BigData/BDA_PROJECT/HealthInsight/docs/screenshot_checklist.md) |
-| **5-Minute Demo Script** | Timed presentation script for the viva panel | [docs/demo_script.md](file:///c:/MyDrive/SEM-7/BigData/BDA_PROJECT/HealthInsight/docs/demo_script.md) |
-| **Viva Questions (25 Q&A)** | Master oral defense questions and comprehensive answers | [docs/viva_questions.md](file:///c:/MyDrive/SEM-7/BigData/BDA_PROJECT/HealthInsight/docs/viva_questions.md) |
-| **Final Technical Audit** | Architectural consistency and anti-pattern clearance record | [docs/final_audit.md](file:///c:/MyDrive/SEM-7/BigData/BDA_PROJECT/HealthInsight/docs/final_audit.md) |
+| **Trino Web UI** | http://localhost:8080 | `admin` (no password) |
+| **MongoDB** | mongodb://localhost:27017 | No auth |
+| **Apache Superset** | http://localhost:8088 | `admin` / `admin` |
+| **AI Portal (v2)** | http://localhost:5000 | `admin` / `healthinsight2024` |
 
 ---
 
-## 5. Team Contributions & Subsystem Ownership
+## v1 Pipeline — Verified Metrics
 
-- **Pushkar Kanjani (23BIT153):** Trino distributed SQL query architecture, query optimization, DBeaver validation, and Superset database connector integration.
-- **Hemang Shreemali (23BIT140):** Apache Spark distributed ETL pipeline, deduplication joins, and MongoDB pre-aggregated document export.
-- **Sachi Shah (23BIT142):** Apache Iceberg lakehouse schema definitions, partition specifications, table registration, and storage path alignment.
-- **Yug Thakkar (23BIT149):** Apache Superset clinical daylight dashboard, virtual datasets, charts layout, and presentation layer.
+| Metric | Value |
+|---|---|
+| Total Patients | 12,352 |
+| Total Encounters (`encounter_analytics`) | 321,528 |
+| Total Condition Events (`condition_analytics`) | 114,544 |
+| Iceberg Tables Registered in Trino | 6 |
+| MongoDB Collections Populated | 6 |
+| Superset Dashboard Charts | 6 |
+
+### MongoDB Collections
+
+| Collection | Document Count | Description |
+|---|---|---|
+| `kpis` | 1 | Top-level platform KPIs |
+| `encounter_class_summary` | 6 | Encounter class statistics |
+| `age_group_summary` | 6 | Age group analytics |
+| `top_conditions` | 10 | Most prevalent conditions |
+| `monthly_trend` | ~60 | Encounters per month |
+| `patient_profiles` | 12,352 | Per-patient demographic + encounter summary |
 
 ---
 
-## 6. Official Viva Disclaimer & Final Framing
+## v1 Trino Verification Queries
 
-When opening the presentation, the team must use the exact standardized wording:
+```sql
+-- Record counts
+SELECT COUNT(*) FROM iceberg.healthcare.encounter_analytics;   -- 321,528
+SELECT COUNT(*) FROM iceberg.healthcare.condition_analytics;   -- 114,544
 
-> *"HealthInsight is a local educational prototype for descriptive analytics over synthetic healthcare records."*
+-- Top encounter classes by volume
+SELECT encounter_class, COUNT(*) AS count
+FROM iceberg.healthcare.encounter_analytics
+GROUP BY encounter_class ORDER BY count DESC;
 
-All technical and architectural questions must be answered according to the principles documented in [docs/viva_questions.md](file:///c:/MyDrive/SEM-7/BigData/BDA_PROJECT/HealthInsight/docs/viva_questions.md).
+-- Most prevalent conditions
+SELECT description, COUNT(*) AS cases
+FROM iceberg.healthcare.condition_analytics
+GROUP BY description ORDER BY cases DESC LIMIT 10;
+```
+
+---
+
+## v2 Portal Setup Checklist
+
+- [ ] `PORTAL_JWT_SECRET` set in `.env` (change from default).
+- [ ] `GEMINI_API_KEY` set in `.env` (optional — offline fallback works without it).
+- [ ] Docker services running: `docker compose up -d trino mongodb`.
+- [ ] Portal started: `python -m uvicorn portal.server:app --port 5000 --reload`.
+- [ ] Login verified: `admin` / `healthinsight2024`.
+- [ ] AI Copilot test: "Top 10 conditions by frequency" returns real Trino data.
+- [ ] Patient Explorer test: valid synthetic patient ID returns demographic card.
+
+---
+
+## Repository Structure
+
+```
+HealthInsight/
+├── .env                        ← Local secrets (not committed)
+├── .env.example                ← Template with all required vars
+├── docker-compose.yml          ← MongoDB + Trino + Superset services
+├── requirements.txt            ← All Python deps (v1 + v2)
+├── README.md                   ← Full platform documentation
+├── PROMPT_BOOK.md              ← AI build instructions (Prompts 00–32)
+│
+├── spark/                      ← v1: Distributed ETL scripts
+│   ├── 00_test_iceberg.py
+│   ├── 01_profile_dataset.py
+│   ├── 02_ingest_raw_to_iceberg.py
+│   ├── 03_build_analytics_tables.py
+│   └── 04_export_mongodb.py
+│
+├── trino/                      ← v1: Trino catalog + verification queries
+│   ├── catalog/                ← iceberg.properties
+│   └── queries/                ← SQL verification scripts
+│
+├── iceberg/                    ← v1: Iceberg warehouse (Parquet + metadata)
+│   └── warehouse/
+│
+├── mongodb/                    ← v1: MongoDB init scripts
+│
+├── superset/                   ← v1: Superset Docker config + setup
+│
+├── portal/                     ← v2: AI Command Center (to be built)
+│   ├── server.py
+│   ├── auth.py
+│   ├── query_engine.py
+│   ├── ai_engine.py
+│   ├── mongo_service.py
+│   ├── schema_context.py
+│   └── static/
+│       ├── index.html
+│       ├── dashboard.html
+│       ├── style.css
+│       ├── three-scene.js
+│       └── auth.js
+│
+├── scripts/                    ← Pipeline + portal start scripts
+│   ├── run_pipeline.ps1
+│   ├── run_pipeline.sh
+│   ├── start_portal.ps1        ← (to be created in Prompt 32)
+│   └── start_portal.sh         ← (to be created in Prompt 32)
+│
+└── docs/                       ← All documentation
+    ├── DOC1_PRD_TECHSTACK_ARCHITECTURE.md
+    ├── DOC2_TRD_DB_PIPELINE.md
+    ├── DOC3_UI_BRIEF_DEMO_VIVA.md
+    ├── v2_build_plan.md        ← v2 implementation plan
+    ├── final_handover.md       ← This file
+    ├── architecture.md
+    ├── data_lineage.md
+    ├── dataset_dictionary.md
+    ├── analytics_support_matrix.md
+    ├── mongodb_verification.md
+    ├── project_audit.md
+    ├── team_setup_guide.md
+    ├── version_lock.md
+    └── viva_questions.md
+```
+
+---
+
+## Git Commit History
+
+| Phase | Commits | Description |
+|---|---|---|
+| **v1 Prompts 00–22** | 15 commits | Full Lakehouse: Spark ETL, Iceberg tables, Trino SQL, MongoDB, Superset |
+| **v2 Prompts 23–32** | 10 commits (planned) | AI Portal: FastAPI, JWT, Gemini, Three.js UI |
+
+---
+
+## Known Working Versions (Locked)
+
+| Tool | Version |
+|---|---|
+| Python | 3.11.9 |
+| PySpark | 3.5.3 |
+| Apache Iceberg Runtime | 1.5.2 |
+| Trino (Docker) | 435 |
+| MongoDB (Docker) | 7.0 |
+| Apache Superset (Docker) | 3.1.x |
+| FastAPI | 0.115.0 |
+| PyJWT | 2.10.1 |
+| google-genai SDK | 1.21.0 |
