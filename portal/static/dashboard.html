@@ -1,380 +1,816 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HealthInsight — Clinical AI Command Center</title>
-  <link rel="stylesheet" href="/static/style.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2300D4FF'><path d='M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z'/></svg>">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — HealthInsight Clinical AI</title>
+  <meta name="description" content="HealthInsight real-time clinical analytics dashboard. Monitor 10M+ patient records, query with AI Copilot, explore patient timelines." />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- Lenis Smooth Scroll (CDN) -->
+  <script src="https://unpkg.com/@studio-freight/lenis@1.0.42/dist/lenis.min.js" defer></script>
+
+  <!-- Chart.js (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js" defer></script>
+
+  <link rel="stylesheet" href="/static/style.css" />
+
+  <style>
+    /* ── Dashboard extra styles ─────────────────────────────────────────── */
+
+    /* Two-col layout for copilot + patient explorer side-by-side on wide screens */
+    .dual-col {
+      display: grid;
+      grid-template-columns: 3fr 2fr;
+      gap: 22px;
+    }
+
+    @media (max-width: 1200px) {
+      .dual-col { grid-template-columns: 1fr; }
+    }
+
+    /* Patient result container transitions */
+    #patient-result-container {
+      transition: opacity 320ms var(--ease-spring), transform 320ms var(--ease-spring);
+    }
+    #patient-result-container.loading {
+      opacity: 0.4;
+      transform: translateY(6px);
+    }
+
+    /* Typing indicator */
+    .typing-dots {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 12px 18px;
+      background: var(--glass-bg-heavy);
+      border: 1px solid rgba(0,0,0,0.06);
+      border-radius: 18px 18px 18px 4px;
+      align-self: flex-start;
+    }
+    .typing-dots span {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--text-tertiary);
+      animation: dot-bounce 1.2s infinite;
+    }
+    .typing-dots span:nth-child(2) { animation-delay: 0.18s; }
+    .typing-dots span:nth-child(3) { animation-delay: 0.36s; }
+    @keyframes dot-bounce {
+      0%,80%,100% { transform: translateY(0);    opacity: 0.4; }
+      40%          { transform: translateY(-7px); opacity: 1;   }
+    }
+
+    /* Monitor service cards row */
+    .infra-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 18px;
+    }
+
+    /* Iceberg tables list */
+    #iceberg-tables-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .iceberg-table-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: rgba(255,255,255,0.55);
+      border: 1px solid rgba(0,0,0,0.05);
+      border-radius: var(--r-md);
+      font-size: 0.85rem;
+      transition: background var(--t-fast);
+    }
+    .iceberg-table-row:hover { background: white; }
+    .iceberg-table-name { font-family: var(--font-mono); color: var(--text-primary); font-weight: 500; }
+    .iceberg-table-meta { font-size: var(--t-caption); color: var(--text-tertiary); }
+
+    /* Collections mini-table */
+    .collections-mini-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      margin-top: 10px;
+    }
+    .collections-mini-table th {
+      font-size: var(--t-micro);
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      padding: 6px 10px;
+      text-align: left;
+      border-bottom: 1px solid rgba(0,0,0,0.07);
+    }
+    .collections-mini-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(0,0,0,0.04);
+      color: var(--text-secondary);
+    }
+    .collections-mini-table td:first-child {
+      font-family: var(--font-mono);
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+    .collections-mini-table tr:last-child td { border-bottom: none; }
+
+    /* Empty / loading state */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 48px 24px;
+      color: var(--text-tertiary);
+      text-align: center;
+    }
+    .empty-state svg { width: 38px; height: 38px; fill: currentColor; opacity: 0.4; }
+    .empty-state p { font-size: 0.875rem; line-height: 1.5; }
+
+    /* Patient encounter timeline */
+    .enc-type-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 9px;
+      border-radius: var(--r-pill);
+      font-size: 11px;
+      font-weight: 600;
+      background: var(--sage-bg);
+      color: var(--sage-ink);
+      border: 1px solid var(--sage-border);
+    }
+    .enc-type-chip.emergency { background: var(--rose-bg); color: var(--rose-ink); border-color: rgba(185,50,65,0.18); }
+    .enc-type-chip.wellness  { background: var(--amber-bg); color: var(--amber-ink); border-color: rgba(180,115,0,0.18); }
+
+    /* Scroll container for patient timeline */
+    #encounter-list-wrapper {
+      max-height: 340px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0,0,0,0.10) transparent;
+    }
+
+    /* Monitor latency bar */
+    .latency-bar-wrapper {
+      height: 4px;
+      background: rgba(0,0,0,0.06);
+      border-radius: 2px;
+      overflow: hidden;
+      flex: 1;
+    }
+    .latency-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      background: var(--sage-dot);
+      transition: width 600ms var(--ease-spring);
+    }
+
+    /* Chart section */
+    .charts-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+    @media (max-width: 800px) { .charts-row { grid-template-columns: 1fr; } }
+    .chart-card { padding: 20px 22px; }
+    .chart-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 14px;
+    }
+  </style>
 </head>
 <body>
 
-  <!-- WebGL Liquid / Water Flow Cursor Reactive Canvas -->
-  <canvas id="webgl-canvas"></canvas>
+  <!-- Pastel mesh background -->
+  <canvas id="webgl-canvas" aria-hidden="true"></canvas>
 
+  <!-- Hidden SVG filter library -->
+  <svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+    <defs>
+      <filter id="liquid-glass-refract" x="-5%" y="-5%" width="110%" height="110%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.012 0.008" numOctaves="3" seed="4" result="noise"/>
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="6" xChannelSelector="R" yChannelSelector="G"/>
+      </filter>
+    </defs>
+  </svg>
+
+  <!-- Custom cursor -->
+  <div id="cursor-dot"  aria-hidden="true"></div>
+  <div id="cursor-blob" aria-hidden="true"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!--  APP CONTAINER                                                          -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
   <div class="app-container">
 
-    <!-- Top Sticky Glass Navbar -->
-    <header class="navbar">
-      <a href="#section-copilot" class="nav-brand">
-        <div class="nav-logo-icon">
-          <svg viewBox="0 0 24 24">
-            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
-          </svg>
-        </div>
-        <div>
-          <span class="nav-title text-gradient-cyan">HealthInsight</span>
-          <span class="nav-tag" style="margin-left: 6px;">v2.0 AI</span>
-        </div>
-      </a>
+    <!-- ── NAVIGATION ──────────────────────────────────────────────────── -->
+    <header>
+      <nav class="navbar glass-panel glass-heavy" id="main-nav" aria-label="Main navigation">
 
-      <ul class="nav-links">
-        <li><a href="#section-copilot" class="nav-link active">🤖 AI Copilot</a></li>
-        <li><a href="#section-explorer" class="nav-link">🔍 Patient Explorer</a></li>
-        <li><a href="#section-monitor" class="nav-link">📡 Lakehouse Monitor</a></li>
-        <li><a href="http://localhost:8088" target="_blank" rel="noopener noreferrer" class="nav-link" style="color: var(--cyan-primary);">📊 Superset BI ↗</a></li>
-      </ul>
+        <!-- Brand -->
+        <a class="nav-brand" href="/dashboard" aria-label="HealthInsight home">
+          <div class="nav-logo-icon">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+            </svg>
+          </div>
+          <span class="nav-title">HealthInsight</span>
+          <span class="nav-tag">v2</span>
+        </a>
 
-      <div class="nav-actions">
-        <div class="status-badge" id="system-status-badge">
-          <span class="pulse-dot"></span>
-          <span>LAKEHOUSE LIVE</span>
+        <!-- Links -->
+        <ul class="nav-links" role="list">
+          <li>
+            <a class="nav-link active" href="#kpi" aria-current="page">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
+              Overview
+            </a>
+          </li>
+          <li>
+            <a class="nav-link" href="#copilot">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+              AI Copilot
+            </a>
+          </li>
+          <li>
+            <a class="nav-link" href="#explorer">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+              Patient Explorer
+            </a>
+          </li>
+          <li>
+            <a class="nav-link" href="#monitor">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+              Monitor
+            </a>
+          </li>
+        </ul>
+
+        <!-- Actions -->
+        <div class="nav-actions">
+          <div id="system-status-badge" class="status-badge" role="status" aria-live="polite">
+            <span class="pulse-dot" aria-hidden="true"></span>
+            System Online
+          </div>
+          <button class="btn-ghost" id="nav-logout-btn" type="button" aria-label="Sign out">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+            Sign out
+          </button>
         </div>
-        <button class="btn-ghost" onclick="logout()" title="End Session">
-          <span>Exit</span>
-          <svg style="width:14px;height:14px;fill:currentColor;" viewBox="0 0 24 24"><path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
-        </button>
-      </div>
+
+      </nav>
     </header>
 
-    <!-- Main Content Container -->
-    <main class="main-content">
+    <!-- ── MAIN CONTENT ─────────────────────────────────────────────────── -->
+    <main class="main-content" id="main-content">
 
-      <!-- Executive KPIs Grid -->
-      <section class="kpi-grid">
-        <div class="glass-panel kpi-card">
-          <div class="kpi-label">
-            <span>Longitudinal Patients</span>
-            <div class="kpi-icon-pill">
-              <svg style="width:18px;height:18px;fill:#00D4FF;" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 3s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
-            </div>
-          </div>
-          <div class="kpi-value text-gradient-cyan" id="kpi-patients">12,330</div>
-          <div class="kpi-sub">Synthetic Massachusetts cohort · MITRE Synthea</div>
-        </div>
+      <!-- ════════════════════════════════════════════════════════════════ -->
+      <!--  SECTION 1: KPI OVERVIEW                                         -->
+      <!-- ════════════════════════════════════════════════════════════════ -->
+      <section id="kpi" class="page-section" aria-labelledby="kpi-heading">
 
-        <div class="glass-panel kpi-card">
-          <div class="kpi-label">
-            <span>Clinical Encounters</span>
-            <div class="kpi-icon-pill">
-              <svg style="width:18px;height:18px;fill:#8B5CF6;" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>
-            </div>
-          </div>
-          <div class="kpi-value" style="color: #A78BFA;" id="kpi-encounters">321,528</div>
-          <div class="kpi-sub">Partitioned Iceberg table · 1 row per event</div>
-        </div>
-
-        <div class="glass-panel kpi-card">
-          <div class="kpi-label">
-            <span>Gross Billed Claims</span>
-            <div class="kpi-icon-pill">
-              <svg style="width:18px;height:18px;fill:#10B981;" viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
-            </div>
-          </div>
-          <div class="kpi-value" style="color: #34D399;" id="kpi-cost">$41.38M</div>
-          <div class="kpi-sub">Zero-inflation verified · Trino validated</div>
-        </div>
-
-        <div class="glass-panel kpi-card">
-          <div class="kpi-label">
-            <span>Average Claim / Visit</span>
-            <div class="kpi-icon-pill">
-              <svg style="width:18px;height:18px;fill:#F59E0B;" viewBox="0 0 24 24"><path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg>
-            </div>
-          </div>
-          <div class="kpi-value" style="color: #FBBF24;" id="kpi-duration">$128.71</div>
-          <div class="kpi-sub">Pre-aggregated MongoDB WiredTiger serving</div>
-        </div>
-      </section>
-
-      <!-- ====================================================================
-           SECTION 1: AI COPILOT
-           ==================================================================== -->
-      <section id="section-copilot">
         <div class="section-header">
           <div>
-            <h2 class="section-title">Ask HealthInsight AI Copilot</h2>
-            <p class="section-subtitle">Ask analytical healthcare questions in plain English — Gemini translates to Trino SQL across 321,528 records.</p>
+            <h2 class="section-title" id="kpi-heading">Clinical Overview</h2>
+            <p class="section-subtitle">Real-time aggregates from Iceberg lakehouse via Trino — refreshed every 30 s</p>
           </div>
-          <div style="font-size: 0.8rem; color: var(--cyan-primary); display: flex; align-items: center; gap: 6px;">
-            <svg style="width:14px;height:14px;fill:currentColor;" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
-            <span>Trino MPP Engine · Port 8080</span>
+          <button class="btn-ghost" id="btn-refresh-kpi" type="button" aria-label="Refresh KPI metrics">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+            Refresh
+          </button>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="kpi-grid">
+
+          <!-- Patients -->
+          <article class="kpi-card glass-panel page-section" aria-label="Total patients metric">
+            <div class="kpi-label">
+              <span class="kpi-label-text">Total Patients</span>
+              <div class="kpi-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+              </div>
+            </div>
+            <span class="t-kpi-value" id="kpi-patients">—</span>
+            <p class="kpi-sub">Unique patient identifiers across all encounters</p>
+          </article>
+
+          <!-- Encounters -->
+          <article class="kpi-card glass-panel page-section" aria-label="Total encounters metric">
+            <div class="kpi-label">
+              <span class="kpi-label-text">Encounters</span>
+              <div class="kpi-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+              </div>
+            </div>
+            <span class="t-kpi-value" id="kpi-encounters">—</span>
+            <p class="kpi-sub">Clinical visits, admissions &amp; procedures</p>
+          </article>
+
+          <!-- Avg Cost -->
+          <article class="kpi-card glass-panel page-section" aria-label="Average encounter cost metric">
+            <div class="kpi-label">
+              <span class="kpi-label-text">Avg Encounter Cost</span>
+              <div class="kpi-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
+              </div>
+            </div>
+            <span class="t-kpi-value" id="kpi-cost">—</span>
+            <p class="kpi-sub">Mean base encounter cost (USD)</p>
+          </article>
+
+          <!-- Avg Duration -->
+          <article class="kpi-card glass-panel page-section" aria-label="Average encounter duration metric">
+            <div class="kpi-label">
+              <span class="kpi-label-text">Avg Duration</span>
+              <div class="kpi-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg>
+              </div>
+            </div>
+            <span class="t-kpi-value" id="kpi-duration">—</span>
+            <p class="kpi-sub">Mean encounter length in minutes</p>
+          </article>
+
+        </div><!-- /kpi-grid -->
+
+        <!-- Charts Row -->
+        <div class="charts-row" style="margin-top:22px;">
+          <div class="chart-card glass-panel page-section">
+            <p class="chart-title">Encounter Type Distribution</p>
+            <div class="chart-wrapper">
+              <canvas id="chart-encounter-types" aria-label="Encounter type distribution chart"></canvas>
+            </div>
+          </div>
+          <div class="chart-card glass-panel page-section">
+            <p class="chart-title">Top 5 Conditions by Volume</p>
+            <div class="chart-wrapper">
+              <canvas id="chart-conditions" aria-label="Top conditions chart"></canvas>
+            </div>
           </div>
         </div>
 
-        <div class="glass-panel copilot-card">
-          
-          <!-- Copilot Card Header -->
-          <div class="copilot-header">
-            <div class="copilot-header-info">
-              <div class="ai-avatar">
-                <svg viewBox="0 0 24 24"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
-              </div>
-              <div>
-                <h3 style="font-size: 1.1rem; color: white;">Clinical Intelligence Engine</h3>
-                <p style="font-size: 0.8rem; color: var(--text-muted);">Grounded on encounter_analytics & condition_analytics tables</p>
-              </div>
-            </div>
+      </section><!-- /kpi -->
+
+      <!-- ════════════════════════════════════════════════════════════════ -->
+      <!--  SECTION 2: AI COPILOT + PATIENT EXPLORER (dual column)          -->
+      <!-- ════════════════════════════════════════════════════════════════ -->
+      <div class="dual-col">
+
+        <!-- AI COPILOT ───────────────────────────────────────────────── -->
+        <section id="copilot" class="page-section" aria-labelledby="copilot-heading">
+
+          <div class="section-header">
             <div>
-              <span id="ai-status-pill" class="status-badge">
-                <span class="pulse-dot"></span> ONLINE
-              </span>
+              <h2 class="section-title" id="copilot-heading">AI Copilot</h2>
+              <p class="section-subtitle">Natural language → SQL → results, powered by Gemini</p>
             </div>
           </div>
 
-          <!-- Quick Question Chips -->
-          <div class="chips-bar">
-            <button class="chip-btn" data-question="What are the top 10 most common clinical conditions?">
-              <span>🩺 Top Conditions</span>
-            </button>
-            <button class="chip-btn" data-question="What is the average claim cost and payer coverage by encounter class?">
-              <span>💰 Cost by Class</span>
-            </button>
-            <button class="chip-btn" data-question="What is the demographic breakdown of visits across age groups?">
-              <span>👥 Age Groups</span>
-            </button>
-            <button class="chip-btn" data-question="What is the split of clinical encounters by patient gender?">
-              <span>⚥ Gender Split</span>
-            </button>
-            <button class="chip-btn" data-question="What are the longitudinal monthly encounter trends over time?">
-              <span>📈 Monthly Trends</span>
-            </button>
-            <button class="chip-btn" data-question="Which cities have the highest number of inpatient hospital admissions?">
-              <span>🏥 Inpatient Admissions</span>
-            </button>
-            <button class="chip-btn" data-question="Which hospitals have the highest emergency encounter volume?">
-              <span>🚨 Emergency Volume</span>
-            </button>
-            <button class="chip-btn" data-question="Compare insurance payer coverage versus patient out-of-pocket costs.">
-              <span>💳 Payer vs Out-of-Pocket</span>
-            </button>
-          </div>
+          <div class="copilot-card glass-panel" style="height:760px;">
 
-          <!-- Chat Conversation Thread -->
-          <div class="chat-thread" id="chat-thread">
-            
-            <!-- Welcome Assistant Message -->
-            <div class="message-item message-ai">
-              <div class="ai-meta-bar">
-                <div class="meta-engine-tag">
-                  <svg style="width:16px;height:16px;fill:currentColor;" viewBox="0 0 24 24"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
-                  <span>HealthInsight Clinical Copilot</span>
+            <!-- Header -->
+            <div class="copilot-header">
+              <div class="copilot-header-info">
+                <div class="ai-avatar" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73A2 2 0 0 1 10 4a2 2 0 0 1 2-2M7.5 13A2.5 2.5 0 0 0 5 15.5 2.5 2.5 0 0 0 7.5 18a2.5 2.5 0 0 0 2.5-2.5A2.5 2.5 0 0 0 7.5 13m9 0a2.5 2.5 0 0 0-2.5 2.5 2.5 2.5 0 0 0 2.5 2.5 2.5 2.5 0 0 0 2.5-2.5A2.5 2.5 0 0 0 16.5 13z"/>
+                  </svg>
                 </div>
-                <div class="meta-stats-pill">
-                  Trino 435 · 321,528 Encounters Indexed
+                <div>
+                  <div style="font-weight:600;font-size:0.95rem;color:var(--text-primary);">HealthInsight Copilot</div>
+                  <div class="t-caption">Gemini AI · SELECT-only guard · Trino 435</div>
                 </div>
               </div>
-              <div style="color: var(--text-main); font-size: 0.95rem; line-height: 1.6;">
-                Welcome! I am connected to your local Big Data Lakehouse. Click any of the clinical prompt chips above or ask your own question in plain English. I synthesize optimized Trino SQL, execute it over partitioned Iceberg storage, and stream interactive charts and tables in real time.
+
+              <!-- AI engine status pill (monitor.js updates this) -->
+              <div id="ai-status-pill" class="status-badge" role="status">
+                <span class="pulse-dot" aria-hidden="true"></span>
+                <span id="ai-engine-name">Initializing…</span>
               </div>
             </div>
 
+            <!-- Quick-question chips -->
+            <div class="chips-bar" role="list" aria-label="Quick question chips">
+              <span style="font-size:var(--t-micro);font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:var(--text-tertiary);white-space:nowrap;flex-shrink:0;">Quick ask:</span>
+
+              <button class="chip-btn" data-question="How many patients are in the dataset?" role="listitem">
+                👥 Patient count
+              </button>
+              <button class="chip-btn" data-question="What are the top 5 most common conditions?" role="listitem">
+                🏥 Top conditions
+              </button>
+              <button class="chip-btn" data-question="What is the average encounter cost by encounter class?" role="listitem">
+                💰 Cost by class
+              </button>
+              <button class="chip-btn" data-question="Show me the top 10 most expensive encounters." role="listitem">
+                📊 Expensive encounters
+              </button>
+              <button class="chip-btn" data-question="What is the gender distribution of patients?" role="listitem">
+                📈 Gender split
+              </button>
+              <button class="chip-btn" data-question="List all available Iceberg tables." role="listitem">
+                🗂️ List tables
+              </button>
+            </div>
+
+            <!-- Chat thread -->
+            <div class="chat-thread" id="chat-thread" role="log" aria-label="Conversation thread" aria-live="polite">
+              <!-- Welcome message -->
+              <div class="message-ai" style="animation:none;border-radius:18px;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+                  <span style="font-size:1.4rem;">👋</span>
+                  <span style="font-weight:600;color:var(--text-primary);">Hello! I'm your Clinical AI Copilot.</span>
+                </div>
+                <p style="font-size:0.9rem;color:var(--text-secondary);line-height:1.6;">
+                  Ask me anything about the patient dataset — I'll translate your question to SQL, query the Iceberg lakehouse via Trino, and present the results. Try a chip above or type your own question.
+                </p>
+                <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;">
+                  <span style="font-size:var(--t-caption);background:var(--sage-bg);color:var(--sage-ink);border:1px solid var(--sage-border);padding:3px 10px;border-radius:var(--r-pill);font-weight:600;">✓ SELECT-only</span>
+                  <span style="font-size:var(--t-caption);background:var(--accent-blue-soft);color:var(--accent-blue);border:1px solid rgba(0,122,255,0.20);padding:3px 10px;border-radius:var(--r-pill);font-weight:600;">⚡ Gemini powered</span>
+                  <span style="font-size:var(--t-caption);background:rgba(0,0,0,0.04);color:var(--text-secondary);border:1px solid rgba(0,0,0,0.07);padding:3px 10px;border-radius:var(--r-pill);font-weight:600;">🔐 JWT authenticated</span>
+                </div>
+              </div>
+            </div><!-- /chat-thread -->
+
+            <!-- Input area -->
+            <div class="copilot-input-container">
+              <input
+                class="chat-input"
+                id="chat-input"
+                type="text"
+                placeholder="Ask a clinical question in plain English…"
+                aria-label="Query input"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button class="btn-send" id="btn-send" type="button" aria-label="Send query" disabled>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                </svg>
+              </button>
+            </div>
+
+          </div><!-- /copilot-card -->
+        </section><!-- /copilot -->
+
+        <!-- PATIENT EXPLORER ─────────────────────────────────────────── -->
+        <section id="explorer" class="page-section" aria-labelledby="explorer-heading">
+
+          <div class="section-header">
+            <div>
+              <h2 class="section-title" id="explorer-heading">Patient Explorer</h2>
+              <p class="section-subtitle">Look up a patient by UUID to see demographics &amp; encounter timeline</p>
+            </div>
           </div>
 
-          <!-- Chat Input Bar -->
-          <div class="copilot-input-container">
-            <input type="text" id="chat-input" class="chat-input" placeholder="Ask a clinical question (e.g. 'Which encounter class has the highest claim costs?')...">
-            <button id="btn-send" class="btn-send" title="Send Question">
-              <svg style="width:20px;height:20px;fill:white;" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-            </button>
-          </div>
+          <div class="glass-panel" style="padding:24px;display:flex;flex-direction:column;gap:18px;">
 
-        </div>
-      </section>
+            <!-- Search bar -->
+            <div class="explorer-search-bar">
+              <input
+                class="patient-input"
+                id="patient-id-input"
+                type="text"
+                placeholder="Enter Patient UUID…"
+                aria-label="Patient UUID"
+                spellcheck="false"
+                autocomplete="off"
+              />
+              <button class="btn-primary" id="btn-search-patient" type="button">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                Search
+              </button>
+            </div>
 
-      <!-- ====================================================================
-           SECTION 2: PATIENT EXPLORER
-           ==================================================================== -->
-      <section id="section-explorer">
+            <!-- Result container (patient-result-container id preserved for patient-explorer.js) -->
+            <div id="patient-result-container">
+
+              <!-- Empty default state -->
+              <div class="empty-state" id="patient-empty-state">
+                <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                <p>Enter a patient UUID above to view their<br>demographic profile and encounter history.</p>
+              </div>
+
+              <!-- Demographics card (hidden until populated) -->
+              <div id="patient-demographics-card" class="patient-demographics-card glass-panel" style="display:none;">
+                <div class="patient-avatar-box">
+                  <div class="patient-avatar" id="patient-initials" aria-hidden="true">—</div>
+                  <div>
+                    <div style="font-weight:600;font-size:1rem;color:var(--text-primary);" id="patient-full-name">—</div>
+                    <div class="t-caption" id="patient-uuid-display" style="margin-top:2px;font-family:var(--font-mono);word-break:break-all;"></div>
+                  </div>
+                </div>
+
+                <div class="detail-row"><span class="detail-label">Date of Birth</span><span class="detail-value" id="pat-dob">—</span></div>
+                <div class="detail-row"><span class="detail-label">Gender</span><span class="detail-value" id="pat-gender">—</span></div>
+                <div class="detail-row"><span class="detail-label">Race</span><span class="detail-value" id="pat-race">—</span></div>
+                <div class="detail-row"><span class="detail-label">City / State</span><span class="detail-value" id="pat-location">—</span></div>
+                <div class="detail-row"><span class="detail-label">Insurance</span><span class="detail-value" id="pat-insurance">—</span></div>
+              </div>
+
+              <!-- Encounter timeline (hidden until populated) -->
+              <div id="patient-encounter-section" style="display:none;margin-top:14px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                  <h3 style="font-size:0.9rem;font-weight:600;color:var(--text-secondary);">Encounter Timeline</h3>
+                  <span class="status-badge" id="encounter-count-badge" style="font-size:11px;padding:2px 10px;"></span>
+                </div>
+                <div id="encounter-list-wrapper">
+                  <!-- Encounter items injected by chat.js / patient-explorer logic -->
+                </div>
+              </div>
+
+            </div><!-- /patient-result-container -->
+          </div><!-- /glass-panel -->
+        </section><!-- /explorer -->
+
+      </div><!-- /dual-col -->
+
+      <!-- ════════════════════════════════════════════════════════════════ -->
+      <!--  SECTION 3: LAKEHOUSE INFRASTRUCTURE MONITOR                     -->
+      <!-- ════════════════════════════════════════════════════════════════ -->
+      <section id="monitor" class="page-section" aria-labelledby="monitor-heading">
+
         <div class="section-header">
           <div>
-            <h2 class="section-title">Patient Journey Explorer</h2>
-            <p class="section-subtitle">Instant lookup of individual patient histories, condition diagnoses, and chronological encounters.</p>
+            <h2 class="section-title" id="monitor-heading">Lakehouse Monitor</h2>
+            <p class="section-subtitle">Live health metrics for Trino, Iceberg, MongoDB &amp; the AI engine</p>
           </div>
-          <div style="font-size: 0.8rem; color: #10B981; display: flex; align-items: center; gap: 6px;">
-            <span class="pulse-dot"></span>
-            <span>MongoDB 7.0 Serving Layer</span>
-          </div>
-        </div>
-
-        <div class="explorer-search-bar">
-          <input type="text" id="patient-id-input" class="patient-input" placeholder="Enter Patient ID (e.g. fef74b94-c2d9-4e22-bc4f-382c82152126)" value="fef74b94-c2d9-4e22-bc4f-382c82152126">
-          <button id="btn-search-patient" class="btn-primary">
-            🔍 Explore Patient Record
-          </button>
-          <button class="btn-ghost" onclick="document.getElementById('patient-id-input').value='66f888db-3cd2-463e-8fa5-43c50dec2a3c'; lookupPatient('66f888db-3cd2-463e-8fa5-43c50dec2a3c');">
-            Try Patient 2
+          <button class="btn-ghost" id="btn-refresh-monitor" type="button" aria-label="Refresh monitor metrics">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+            Refresh
           </button>
         </div>
 
-        <div id="patient-result-container">
-          <!-- Populated by chat.js lookupPatient() -->
-        </div>
-      </section>
+        <!-- Service cards row -->
+        <div class="infra-grid">
 
-      <!-- ====================================================================
-           SECTION 3: LAKEHOUSE MONITOR
-           ==================================================================== -->
-      <section id="section-monitor">
-        <div class="section-header">
-          <div>
-            <h2 class="section-title">Lakehouse Infrastructure Monitor</h2>
-            <p class="section-subtitle">Real-time health telemetry across the 4 Big Data architecture components.</p>
-          </div>
-          <button class="btn-ghost" onclick="loadSystemHealth(); loadCollectionsList();">
-            ⟳ Refresh Telemetry
-          </button>
-        </div>
-
-        <div class="monitor-grid">
-          
-          <!-- Trino Card -->
-          <div class="glass-panel service-card">
+          <!-- Trino -->
+          <div class="service-card glass-panel">
             <div class="service-card-header">
-              <span class="service-name">Trino 435</span>
-              <span id="trino-status-pill" class="status-badge"><span class="pulse-dot"></span> HEALTHY</span>
+              <div>
+                <div class="t-micro-caps" style="margin-bottom:4px;">Query Engine</div>
+                <div class="service-name">Apache Trino</div>
+              </div>
+              <div id="trino-status-pill" class="status-badge" role="status" aria-live="polite">
+                <span class="pulse-dot" aria-hidden="true"></span>
+                Checking…
+              </div>
             </div>
-            <p style="font-size: 0.85rem; color: var(--text-muted);">Distributed MPP Query Engine</p>
+
             <div class="service-stat-row">
-              <span style="color: var(--text-dim);">Latency</span>
-              <span id="trino-latency" style="color: #38BDF8; font-weight: 600; font-family: monospace;">-- ms</span>
+              <span style="color:var(--text-secondary);font-size:0.875rem;">Query Latency</span>
+              <span id="trino-latency" style="font-family:var(--font-mono);font-size:0.875rem;font-weight:600;color:var(--text-primary);">—</span>
             </div>
             <div class="service-stat-row">
-              <span style="color: var(--text-dim);">Records Scanned</span>
-              <span id="trino-records" style="color: white; font-weight: 600;">321,528 rows</span>
+              <span style="color:var(--text-secondary);font-size:0.875rem;">Records Scanned</span>
+              <span id="trino-records" style="font-family:var(--font-mono);font-size:0.875rem;font-weight:600;color:var(--text-primary);">—</span>
             </div>
             <div class="service-stat-row">
-              <span style="color: var(--text-dim);">Catalog / Schema</span>
-              <span style="color: var(--text-muted); font-family: monospace;">iceberg.healthcare</span>
+              <span style="color:var(--text-secondary);font-size:0.875rem;">Catalog</span>
+              <span style="font-family:var(--font-mono);font-size:0.82rem;color:var(--text-secondary);">iceberg → nessie</span>
             </div>
           </div>
 
-          <!-- Iceberg Card -->
-          <div class="glass-panel service-card">
+          <!-- Iceberg -->
+          <div class="service-card glass-panel">
             <div class="service-card-header">
-              <span class="service-name">Apache Iceberg 1.5</span>
-              <span class="status-badge"><span class="pulse-dot"></span> HEALTHY</span>
+              <div>
+                <div class="t-micro-caps" style="margin-bottom:4px;">Table Format</div>
+                <div class="service-name">Apache Iceberg</div>
+              </div>
+              <div class="status-badge" role="status">
+                <span class="pulse-dot" aria-hidden="true"></span>
+                Active
+              </div>
             </div>
-            <p style="font-size: 0.85rem; color: var(--text-muted);">ACID Lakehouse Table Format</p>
-            <div class="service-stat-row">
-              <span style="color: var(--text-dim);">Format Spec</span>
-              <span style="color: #A78BFA; font-weight: 600;">Parquet + Metadata v2</span>
-            </div>
-            <div class="service-stat-row">
-              <span style="color: var(--text-dim);">Lakehouse Tables</span>
-              <span id="iceberg-tables" style="color: white; font-weight: 600;">6 registered</span>
-            </div>
-            <div class="service-stat-row">
-              <span style="color: var(--text-dim);">Storage Substrate</span>
-              <span style="color: var(--text-muted);">Local /warehouse</span>
+
+            <!-- Iceberg tables list — monitor.js populates element #iceberg-tables -->
+            <div id="iceberg-tables" style="margin-top:4px;">
+              <div id="iceberg-tables-list">
+                <div class="iceberg-table-row">
+                  <span class="iceberg-table-name">patients</span>
+                  <span class="iceberg-table-meta">Loading…</span>
+                </div>
+              </div>
             </div>
           </div>
 
-          <!-- MongoDB Card -->
-          <div class="glass-panel service-card">
+          <!-- MongoDB -->
+          <div class="service-card glass-panel">
             <div class="service-card-header">
-              <span class="service-name">MongoDB 7.0</span>
-              <span id="mongo-status-pill" class="status-badge"><span class="pulse-dot"></span> HEALTHY</span>
+              <div>
+                <div class="t-micro-caps" style="margin-bottom:4px;">Document Store</div>
+                <div class="service-name">MongoDB</div>
+              </div>
+              <div id="mongo-status-pill" class="status-badge" role="status" aria-live="polite">
+                <span class="pulse-dot" aria-hidden="true"></span>
+                Checking…
+              </div>
             </div>
-            <p style="font-size: 0.85rem; color: var(--text-muted);">NoSQL Pre-Aggregated Serving Layer</p>
+
             <div class="service-stat-row">
-              <span style="color: var(--text-dim);">Ping Latency</span>
-              <span id="mongo-latency" style="color: #10B981; font-weight: 600; font-family: monospace;">-- ms</span>
+              <span style="color:var(--text-secondary);font-size:0.875rem;">Query Latency</span>
+              <span id="mongo-latency" style="font-family:var(--font-mono);font-size:0.875rem;font-weight:600;color:var(--text-primary);">—</span>
             </div>
             <div class="service-stat-row">
-              <span style="color: var(--text-dim);">Indexed Collections</span>
-              <span id="mongo-collections" style="color: white; font-weight: 600;">6 collections</span>
+              <span style="color:var(--text-secondary);font-size:0.875rem;">Collections</span>
+              <span id="mongo-collections" style="font-family:var(--font-mono);font-size:0.875rem;font-weight:600;color:var(--text-primary);">—</span>
             </div>
-            <div class="service-stat-row">
-              <span style="color: var(--text-dim);">Serving Database</span>
-              <span style="color: var(--text-muted); font-family: monospace;">healthinsight</span>
+
+            <!-- Collections breakdown table -->
+            <div style="overflow-x:auto;max-height:140px;overflow-y:auto;">
+              <table class="collections-mini-table" aria-label="MongoDB collections">
+                <thead>
+                  <tr>
+                    <th>Collection</th>
+                    <th>Documents</th>
+                  </tr>
+                </thead>
+                <tbody id="collections-table-body">
+                  <tr><td colspan="2" style="color:var(--text-tertiary);font-style:italic;padding:12px 10px;">Loading…</td></tr>
+                </tbody>
+              </table>
             </div>
           </div>
 
-          <!-- AI Engine Card -->
-          <div class="glass-panel service-card">
+          <!-- AI Engine -->
+          <div class="service-card glass-panel">
             <div class="service-card-header">
-              <span class="service-name">Clinical AI Engine</span>
-              <span id="ai-status-pill" class="status-badge"><span class="pulse-dot"></span> ONLINE</span>
+              <div>
+                <div class="t-micro-caps" style="margin-bottom:4px;">NL → SQL</div>
+                <div class="service-name">AI Engine</div>
+              </div>
+              <!-- ai-status-pill ID: first occurrence is in copilot header; this is a display-only copy -->
+              <div class="status-badge" role="status">
+                <span class="pulse-dot" aria-hidden="true"></span>
+                Active
+              </div>
             </div>
-            <p style="font-size: 0.85rem; color: var(--text-muted);">Natural Language Text-to-SQL</p>
+
             <div class="service-stat-row">
-              <span style="color: var(--text-dim);">Active Engine</span>
-              <span id="ai-engine-name" style="color: #FBBF24; font-weight: 600;">Gemini + Fallback</span>
+              <span style="color:var(--text-secondary);font-size:0.875rem;">Active Backend</span>
+              <span style="font-family:var(--font-mono);font-size:0.82rem;color:var(--text-primary);font-weight:500;">Gemini Flash</span>
             </div>
             <div class="service-stat-row">
-              <span style="color: var(--text-dim);">Fallback Safeguard</span>
-              <span style="color: #10B981; font-weight: 600;">12 Templates Active</span>
+              <span style="color:var(--text-secondary);font-size:0.875rem;">Fallback</span>
+              <span style="font-family:var(--font-mono);font-size:0.82rem;color:var(--text-secondary);">Deterministic regex</span>
             </div>
             <div class="service-stat-row">
-              <span style="color: var(--text-dim);">Safety Guard</span>
-              <span style="color: var(--text-muted);">SELECT-only enforced</span>
+              <span style="color:var(--text-secondary);font-size:0.875rem;">Guard</span>
+              <span class="enc-type-chip">SELECT-only</span>
             </div>
           </div>
 
-        </div>
+        </div><!-- /infra-grid -->
 
-        <!-- MongoDB Collections Inventory Table -->
-        <div class="glass-panel" style="margin-top: 24px; padding: 24px;">
-          <h3 style="color: white; font-size: 1.15rem; margin-bottom: 16px;">MongoDB Serving Layer Inventory</h3>
-          <div class="table-wrapper">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Collection</th>
-                  <th>Document Count</th>
-                  <th>Clinical Description</th>
-                  <th>Engine</th>
-                </tr>
-              </thead>
-              <tbody id="collections-table-body">
-                <!-- Dynamically populated by monitor.js -->
-              </tbody>
-            </table>
-          </div>
-        </div>
+      </section><!-- /monitor -->
 
-      </section>
+    </main><!-- /main-content -->
+  </div><!-- /app-container -->
 
-    </main>
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!--  SCRIPTS                                                               -->
+  <!--  Order matters: motion before auth so Lenis initialises first          -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
 
-  </div>
+  <!-- Background canvas (no Three.js CDN needed) -->
+  <script src="/static/three-scene.js" defer></script>
 
-  <!-- CDN Dependencies -->
-  <!-- 1. Three.js for WebGL Liquid Water Background -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r160/three.min.js"></script>
-  <!-- 2. Lenis for Apple-grade Smooth Scrolling -->
-  <script src="https://unpkg.com/lenis@1.1.18/dist/lenis.min.js"></script>
-  <!-- 3. Chart.js for Dynamic Clinical Visualizations -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Liquid cursor + reactive glass -->
+  <script src="/static/cursor.js" defer></script>
 
-  <!-- Application Modules -->
-  <script src="/static/auth.js"></script>
-  <script src="/static/three-scene.js"></script>
-  <script src="/static/lenis-scroll.js"></script>
-  <script src="/static/monitor.js"></script>
-  <script src="/static/chat.js"></script>
+  <!-- Motion (Lenis, scroll-reveal, count-up) -->
+  <script src="/static/motion.js" defer></script>
 
+  <!-- Auth & session -->
+  <script src="/static/auth.js" defer></script>
+
+  <!-- AI Copilot (chat.js must keep all getElementById hooks intact) -->
+  <script src="/static/chat.js" defer></script>
+
+  <!-- Infrastructure monitor -->
+  <script src="/static/monitor.js" defer></script>
+
+  <!-- Inline: Chart.js initialisation (light palette) -->
   <script>
-    // Enforce JWT Auth protection
-    requireAuth();
+  document.addEventListener('DOMContentLoaded', function () {
+    // Wait for Chart.js CDN to load
+    if (typeof Chart === 'undefined') return;
 
-    // Trigger initial default patient lookup
-    document.addEventListener('DOMContentLoaded', () => {
-      setTimeout(() => {
-        lookupPatient('fef74b94-c2d9-4e22-bc4f-382c82152126');
-      }, 300);
-    });
+    // Light-mode palette
+    const palette = [
+      'rgba(0,122,255,0.70)',
+      'rgba(90,200,250,0.70)',
+      'rgba(52,199,89,0.70)',
+      'rgba(255,159,10,0.70)',
+      'rgba(175,82,222,0.70)',
+      'rgba(255,69,58,0.70)',
+    ];
+
+    const baseOpts = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: {
+            font: { family: 'Inter, -apple-system, sans-serif', size: 11 },
+            color: 'rgba(60,60,67,0.6)',
+            boxWidth: 10,
+            padding: 12,
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(255,255,255,0.92)',
+          titleColor: '#1D1D1F',
+          bodyColor: 'rgba(60,60,67,0.6)',
+          borderColor: 'rgba(0,0,0,0.08)',
+          borderWidth: 1,
+          cornerRadius: 10,
+          padding: 10,
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(0,0,0,0.05)' },
+          ticks: { color: 'rgba(60,60,67,0.5)', font: { size: 11 } },
+        },
+        y: {
+          grid: { color: 'rgba(0,0,0,0.05)' },
+          ticks: { color: 'rgba(60,60,67,0.5)', font: { size: 11 } },
+        }
+      }
+    };
+
+    // Encounter types doughnut
+    const ctxET = document.getElementById('chart-encounter-types');
+    if (ctxET) {
+      new Chart(ctxET, {
+        type: 'doughnut',
+        data: {
+          labels: ['Ambulatory', 'Emergency', 'Inpatient', 'Wellness', 'Urgentcare', 'Other'],
+          datasets: [{
+            data: [0, 0, 0, 0, 0, 0],
+            backgroundColor: palette,
+            borderColor: 'rgba(255,255,255,0.95)',
+            borderWidth: 3,
+            hoverOffset: 6,
+          }]
+        },
+        options: {
+          ...baseOpts,
+          scales: {},  // no axis for doughnut
+          cutout: '62%',
+          plugins: {
+            ...baseOpts.plugins,
+            legend: { ...baseOpts.plugins.legend, position: 'right' },
+          }
+        }
+      });
+    }
+
+    // Top conditions bar
+    const ctxCond = document.getElementById('chart-conditions');
+    if (ctxCond) {
+      new Chart(ctxCond, {
+        type: 'bar',
+        data: {
+          labels: ['Loading…'],
+          datasets: [{
+            label: 'Patient count',
+            data: [0],
+            backgroundColor: palette[0],
+            borderRadius: 6,
+            borderSkipped: false,
+          }]
+        },
+        options: {
+          ...baseOpts,
+          indexAxis: 'y',
+          plugins: {
+            ...baseOpts.plugins,
+            legend: { display: false },
+          }
+        }
+      });
+    }
+  });
   </script>
 
 </body>

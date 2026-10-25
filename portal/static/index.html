@@ -1,122 +1,179 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>HealthInsight — Clinical AI Command Center</title>
-  <link rel="stylesheet" href="/static/style.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2300D4FF'><path d='M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z'/></svg>">
+  <meta name="description" content="Secure access to HealthInsight Clinical AI Command Center. Query 10M+ patient records with natural language powered by Gemini and Apache Trino." />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="/static/style.css" />
+
+  <style>
+    /* Login-specific overrides */
+    .login-logo-ring {
+      width: 68px;
+      height: 68px;
+      border-radius: 20px;
+      background: var(--text-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      box-shadow: 0 12px 36px rgba(0,0,0,0.14), 0 4px 10px rgba(0,0,0,0.08);
+    }
+    .login-logo-ring svg { width: 36px; height: 36px; fill: white; }
+
+    .stack-badges {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .stack-badge {
+      padding: 3px 9px;
+      font-size: 10.5px;
+      font-weight: 600;
+      border-radius: var(--r-pill);
+      background: rgba(0,0,0,0.04);
+      color: var(--text-tertiary);
+      border: 1px solid rgba(0,0,0,0.06);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .login-footer {
+      text-align: center;
+      font-size: var(--t-caption);
+      color: var(--text-tertiary);
+    }
+    .login-footer a {
+      color: var(--accent-blue);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .login-footer a:hover { text-decoration: underline; }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text-tertiary);
+      font-size: var(--t-caption);
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(0,0,0,0.07);
+    }
+  </style>
 </head>
 <body>
 
-  <!-- WebGL Liquid Cursor Reactive Canvas -->
-  <canvas id="webgl-canvas"></canvas>
+  <!-- Pastel mesh background -->
+  <canvas id="webgl-canvas" aria-hidden="true"></canvas>
 
+  <!-- Hidden SVG filter library -->
+  <svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+    <defs>
+      <filter id="liquid-glass-refract" x="-5%" y="-5%" width="110%" height="110%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.012 0.008" numOctaves="3" seed="4" result="noise"/>
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="6" xChannelSelector="R" yChannelSelector="G"/>
+      </filter>
+    </defs>
+  </svg>
+
+  <!-- Custom cursor -->
+  <div id="cursor-dot"  aria-hidden="true"></div>
+  <div id="cursor-blob" aria-hidden="true"></div>
+
+  <!-- App container -->
   <div class="app-container">
-    <div class="login-wrapper">
-      <div class="glass-panel glass-panel-glow login-card">
-        
+    <main class="login-wrapper">
+      <div class="login-card glass-panel glass-heavy glass-refract">
+
+        <!-- Header -->
         <div class="login-header">
-          <div style="display: inline-flex; justify-content: center; margin-bottom: 8px;">
-            <div class="nav-logo-icon" style="width: 52px; height: 52px;">
-              <svg viewBox="0 0 24 24" style="width: 28px; height: 28px;">
-                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
-              </svg>
-            </div>
+          <div class="login-logo-ring">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+            </svg>
           </div>
-          <h1 class="login-title text-gradient-cyan">HealthInsight</h1>
-          <p class="login-desc">Clinical AI Command Center · Big Data Lakehouse</p>
-          <div style="margin-top: 8px;">
-            <span class="nav-tag">Spark 3.5 · Iceberg 1.5 · Trino 435 · MongoDB 7.0</span>
+
+          <h1 class="login-title">HealthInsight</h1>
+          <p class="login-desc">Clinical AI Command Center<br>on a Big Data Lakehouse</p>
+
+          <div class="stack-badges">
+            <span class="stack-badge">Trino 435</span>
+            <span class="stack-badge">Iceberg 1.5</span>
+            <span class="stack-badge">Gemini AI</span>
+            <span class="stack-badge">MongoDB 7</span>
           </div>
         </div>
 
-        <div id="error-banner" class="error-banner"></div>
-
-        <form id="login-form" class="login-form">
+        <!-- Form -->
+        <form class="login-form" id="login-form" novalidate autocomplete="on">
           <div class="form-group">
-            <label class="form-label" for="username">Operator ID</label>
-            <input type="text" id="username" class="form-input" placeholder="admin" value="admin" required autocomplete="username">
+            <label class="form-label" for="username-input">Username</label>
+            <input
+              class="form-input"
+              id="username-input"
+              type="text"
+              placeholder="e.g. admin"
+              autocomplete="username"
+              spellcheck="false"
+              required
+            />
           </div>
 
           <div class="form-group">
-            <label class="form-label" for="password">Security Passcode</label>
-            <input type="password" id="password" class="form-input" placeholder="••••••••••••" value="healthinsight2024" required autocomplete="current-password">
+            <label class="form-label" for="password-input">Password</label>
+            <input
+              class="form-input"
+              id="password-input"
+              type="password"
+              placeholder="••••••••"
+              autocomplete="current-password"
+              required
+            />
           </div>
 
-          <button type="submit" id="submit-btn" class="btn-primary" style="margin-top: 8px; width: 100%; height: 48px;">
-            <span id="btn-text">Authenticate & Launch</span>
+          <!-- Error banner -->
+          <div id="login-error" class="error-banner" role="alert" aria-live="polite"></div>
+
+          <button class="btn-primary" id="login-btn" type="submit" style="width:100%;padding:13px;font-size:0.975rem;">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M11 17l-5-5 1.41-1.41L11 14.17l7.59-7.59L20 8l-9 9z"/>
+            </svg>
+            Sign In
           </button>
         </form>
 
-        <div style="text-align: center; font-size: 0.8rem; color: var(--text-dim);">
-          Stateless JWT Session · Role: Clinical Lakehouse Administrator
+        <!-- Footer -->
+        <div class="login-footer">
+          <p>Demo credentials: <strong>admin / healthinsight2024</strong></p>
+          <p style="margin-top:6px;">
+            Big Data Analytics Project ·
+            <a href="https://github.com" target="_blank" rel="noopener">GitHub</a>
+          </p>
         </div>
 
-      </div>
-    </div>
-  </div>
+      </div><!-- /login-card -->
+    </main>
+  </div><!-- /app-container -->
 
-  <!-- Three.js CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r160/three.min.js"></script>
-  <!-- Three.js Liquid Scene -->
-  <script src="/static/three-scene.js"></script>
-  <!-- Auth Client -->
-  <script src="/static/auth.js"></script>
-
-  <script>
-    // Redirect if already authenticated
-    redirectIfAuthenticated();
-
-    const form = document.getElementById('login-form');
-    const submitBtn = document.getElementById('submit-btn');
-    const btnText = document.getElementById('btn-text');
-    const errorBanner = document.getElementById('error-banner');
-    const loginCard = document.querySelector('.login-card');
-
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      errorBanner.style.display = 'none';
-      submitBtn.disabled = true;
-      btnText.textContent = 'Verifying credentials...';
-
-      const username = document.getElementById('username').value.trim();
-      const password = document.getElementById('password').value.trim();
-
-      try {
-        const res = await fetch('/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password })
-        });
-
-        const data = await res.json();
-
-        if (res.ok) {
-          saveSession(data.access_token, data.username);
-          btnText.textContent = 'Session verified! Redirecting...';
-          setTimeout(() => {
-            window.location.href = '/dashboard';
-          }, 350);
-        } else {
-          showError(data.detail || 'Authentication failed.');
-        }
-      } catch (err) {
-        showError('Network connectivity error. Ensure backend server is reachable.');
-      } finally {
-        submitBtn.disabled = false;
-        btnText.textContent = 'Authenticate & Launch';
-      }
-    });
-
-    function showError(msg) {
-      errorBanner.textContent = msg;
-      errorBanner.style.display = 'block';
-      loginCard.classList.remove('shake');
-      void loginCard.offsetWidth; // trigger reflow
-      loginCard.classList.add('shake');
-    }
-  </script>
-
+  <!-- JS -->
+  <!-- NOTE: Three.js CDN removed — background is now pure Canvas 2D -->
+  <script src="/static/three-scene.js" defer></script>
+  <script src="/static/cursor.js" defer></script>
+  <script src="/static/motion.js" defer></script>
+  <script src="/static/auth.js" defer></script>
 </body>
 </html>
